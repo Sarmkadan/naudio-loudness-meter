@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>NAudio.Loudness</RootNamespace>
+    <AssemblyName>NAudio.Loudness</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+
+    <PackageId>NAudio.Loudness</PackageId>
+    <Version>0.4.0</Version>
+    <Authors>Vladyslav Zaiets</Authors>
+    <Description>EBU R128 / ITU-R BS.1770 loudness measurement (integrated, short-term, momentary LUFS), true-peak metering and loudness normalization for NAudio.</Description>
+    <PackageTags>naudio;audio;loudness;lufs;ebu-r128;bs1770;true-peak;normalization;broadcast</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LoudnessCli/LoudnessCli.csproj" />
+    <Project Path="src/NAudio.Loudness/NAudio.Loudness.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NAudio.Loudness.Tests/NAudio.Loudness.Tests.csproj" />
+  </Folder>
+</Solution>

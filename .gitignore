@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+
+# Rider / VS
+.idea/
+.vs/
+*.suo
+
+# Test / coverage
+[Tt]est[Rr]esults/
+*.trx
+coverage*.xml
+*.coverage
+
+# Local sample audio (don't commit binaries)
+*.wav
+*.flac
+*.mp3
+samples/*.wav
+
+# OS
+.DS_Store
+Thumbs.db
