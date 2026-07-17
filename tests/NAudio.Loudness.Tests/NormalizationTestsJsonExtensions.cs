@@ -38,9 +38,12 @@ public static class NormalizationTestsJsonExtensions
     /// </summary>
     /// <param name="json">The JSON string to deserialize.</param>
     /// <returns>The deserialized normalization tests, or null if the JSON is null or empty.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="json"/> is null.</exception>
     /// <exception cref="JsonException">Thrown when the JSON is invalid or cannot be deserialized.</exception>
     public static NormalizationTests? FromJson(string json)
     {
+        ArgumentNullException.ThrowIfNull(json);
+
         if (string.IsNullOrEmpty(json))
         {
             return null;
@@ -55,8 +58,14 @@ public static class NormalizationTestsJsonExtensions
     /// <param name="json">The JSON string to deserialize.</param>
     /// <param name="value">Receives the deserialized normalization tests, or null if deserialization fails.</param>
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="json"/> is null.</exception>
     public static bool TryFromJson(string json, out NormalizationTests? value)
     {
+        if (json is null)
+        {
+            throw new ArgumentNullException(nameof(json));
+        }
+
         value = null;
 
         if (string.IsNullOrEmpty(json))
@@ -66,8 +75,8 @@ public static class NormalizationTestsJsonExtensions
 
         try
         {
-            value = JsonSerializer.Deserialize<NormalizationTests>(json, _jsonSerializerOptions)!;
-            return true;
+            value = JsonSerializer.Deserialize<NormalizationTests>(json, _jsonSerializerOptions);
+            return value is not null;
         }
         catch (JsonException)
         {
