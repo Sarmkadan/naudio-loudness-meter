@@ -58,7 +58,7 @@ public static class TruePeakMeterTestsExtensions
         ArgumentNullException.ThrowIfNull(meter);
         Assert.True(
             meter.TruePeakDb > meter.SamplePeakDb + minimumDifferenceDb,
-            $"True peak ({meter.TruePeakDb:0.00} dB) should exceed sample peak ({meter.SamplePeakDb:0.00} dB) by at least {minimumDifferenceDb:0.00} dB");
+            $"True peak ({meter.TruePeakDb.ToString("0.00", CultureInfo.InvariantCulture)} dB) should exceed sample peak ({meter.SamplePeakDb.ToString("0.00", CultureInfo.InvariantCulture)} dB) by at least {minimumDifferenceDb.ToString("0.00", CultureInfo.InvariantCulture)} dB");
     }
 
     /// <summary>
