@@ -154,6 +154,45 @@ Assert.Equal(-6.0, rateMeter.IntegratedLufs, 1);
 meter.Reset();
 ```
 
+## LoudnessMeterTestsExtensions
+
+`LoudnessMeterTestsExtensions` is a collection of extension methods that simplify writing unit tests for loudness meter behavior. These methods provide convenient assertions for verifying momentary, short-term, and integrated loudness values, along with utilities for creating meters with test samples and calculating loudness differences.
+
+The extensions handle edge cases like negative infinity values (silence) and provide tolerance-based assertions for floating-point comparisons.
+
+```csharp
+using NAudio.Loudness;
+using NAudio.Loudness.Tests;
+using Xunit;
+
+// Create a meter and feed it some test samples
+var meter = new LoudnessMeter(sampleRate: 48000, channels: 2);
+meter.AddSamples(SignalGenerator.Sine(1000, 0.5, 48000, 4, 2));
+
+// Assert integrated loudness is within tolerance of expected value
+meter.AssertIntegratedLufs(-6.0, 0.01);
+
+// Assert momentary loudness is within tolerance
+meter.AssertMomentaryLufs(-6.0, 0.01);
+
+// Assert short-term loudness is within tolerance
+meter.AssertShortTermLufs(-6.0, 0.01);
+
+// Assert loudness range is within expected bounds
+meter.AssertLoudnessRange(0, 10);
+
+// Calculate loudness difference between two values
+double diff = meter.IntegratedLufs.LoudnessDifference(-12.0);
+Assert.Equal(6.0, diff, 2);
+
+// Assert two values are approximately equal
+(-6.0).AssertApproximatelyEqual(-6.001, 0.01);
+
+// Create a meter with samples in a fluent way
+var testMeter = 48000.WithSamples(2, SignalGenerator.Sine(1000, 0.7, 48000, 4, 2));
+testMeter.AssertIntegratedLufs(-3.0, 0.01);
+```
+
 ## TruePeakMeterTestsExtensions
 
 `TruePeakMeterTestsExtensions` provides a set of extension methods that simplify testing scenarios involving the `TruePeakMeter` class. These methods offer convenient assertions and formatting utilities for verifying true peak and sample peak measurements during unit tests.
