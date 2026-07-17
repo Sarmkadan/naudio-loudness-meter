@@ -9,7 +9,7 @@ namespace NAudio.Loudness;
 /// </summary>
 public static class LoudnessMeterJsonExtensions
 {
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    private static readonly JsonSerializerOptions s_jsonOptions = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
@@ -26,7 +26,10 @@ public static class LoudnessMeterJsonExtensions
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        var options = indented ? s_jsonOptions : s_jsonOptions with { WriteIndented = false };
+        var options = indented ? s_jsonOptions : new JsonSerializerOptions(s_jsonOptions)
+        {
+            WriteIndented = false,
+        };
         return JsonSerializer.Serialize(value, options);
     }
 
