@@ -2,10 +2,18 @@ using Xunit;
 
 namespace NAudio.Loudness.Tests;
 
+/// <summary>
+/// Tests for loudness normalization functionality.
+/// </summary>
 public class NormalizationTests
 {
     private const int Fs = 48000;
 
+    /// <summary>
+    /// Measures the loudness of a signal, calculates the gain needed to reach -23 LUFS,
+    /// normalizes the signal with that gain, and verifies that the resulting integrated
+    /// loudness is approximately -23 LUFS.
+    /// </summary>
     [Fact]
     public void MeasureThenNormalize_HitsTarget()
     {
@@ -21,6 +29,10 @@ public class NormalizationTests
         Assert.Equal(-23.0, after.IntegratedLufs, 1);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="LoudnessAnalysis.GainToReach(double)"/> correctly computes the
+    /// difference between the target LUFS value and the measured integrated loudness.
+    /// </summary>
     [Fact]
     public void GainToReach_ComputesDelta()
     {
@@ -28,6 +40,11 @@ public class NormalizationTests
         Assert.Equal(7.0, analysis.GainToReach(-23.0), 5);
     }
 
+    /// <summary>
+    /// Ensures that the normalizer clamps output samples to the specified true‑peak ceiling.
+    /// A full‑scale sine wave is amplified by 12 dB and a ceiling of –1 dB is applied;
+    /// the test reads the normalized samples and asserts that none exceed the ceiling.
+    /// </summary>
     [Fact]
     public void TruePeakCeiling_ClampsOutput()
     {
