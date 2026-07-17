@@ -6,7 +6,7 @@ using Xunit;
 namespace NAudio.Loudness.Tests;
 
 /// <summary>
-/// Extension methods for <see cref="LoudnessMeterTests"/> that provide convenient
+/// Extension methods for <see cref="LoudnessMeter"/> that provide convenient
 /// assertions and helper methods for testing loudness meter behavior.
 /// </summary>
 public static class LoudnessMeterTestsExtensions
@@ -27,12 +27,12 @@ public static class LoudnessMeterTestsExtensions
         ArgumentNullException.ThrowIfNull(meter);
 
         double actual = meter.IntegratedLufs;
-        if (double.IsNegativeInfinity(actual) && double.IsNegativeInfinity(expectedLufs))
+        if (actual is double.NegativeInfinity && expectedLufs is double.NegativeInfinity)
         {
             return; // Both are negative infinity, which is correct for silence
         }
 
-        if (double.IsNegativeInfinity(actual))
+        if (actual is double.NegativeInfinity)
         {
             Assert.Equal(expectedLufs, actual);
         }
@@ -56,12 +56,12 @@ public static class LoudnessMeterTestsExtensions
         ArgumentNullException.ThrowIfNull(meter);
 
         double actual = meter.MomentaryLufs;
-        if (double.IsNegativeInfinity(actual) && double.IsNegativeInfinity(expectedLufs))
+        if (actual is double.NegativeInfinity && expectedLufs is double.NegativeInfinity)
         {
-            return;
+            return; // Both are negative infinity, which is correct for silence
         }
 
-        if (double.IsNegativeInfinity(actual))
+        if (actual is double.NegativeInfinity)
         {
             Assert.Equal(expectedLufs, actual);
         }
@@ -85,12 +85,12 @@ public static class LoudnessMeterTestsExtensions
         ArgumentNullException.ThrowIfNull(meter);
 
         double actual = meter.ShortTermLufs;
-        if (double.IsNegativeInfinity(actual) && double.IsNegativeInfinity(expectedLufs))
+        if (actual is double.NegativeInfinity && expectedLufs is double.NegativeInfinity)
         {
-            return;
+            return; // Both are negative infinity, which is correct for silence
         }
 
-        if (double.IsNegativeInfinity(actual))
+        if (actual is double.NegativeInfinity)
         {
             Assert.Equal(expectedLufs, actual);
         }
@@ -104,6 +104,7 @@ public static class LoudnessMeterTestsExtensions
     /// <param name="actual">The actual loudness value.</param>
     /// <param name="expected">The expected loudness value.</param>
     /// <param name="tolerance">The maximum allowed difference from expected.</param>
+    /// <param name="memberName">The member name of the caller (automatically provided).</param>
     /// <exception cref="Xunit.AssertActualExpectedException">Thrown when values differ by more than tolerance.</exception>
     public static void AssertApproximatelyEqual(
         this double actual,
@@ -111,12 +112,12 @@ public static class LoudnessMeterTestsExtensions
         double tolerance = 0.01,
         [System.Runtime.CompilerServices.CallerMemberName] string memberName = "")
     {
-        if (double.IsNegativeInfinity(actual) && double.IsNegativeInfinity(expected))
+        if (actual is double.NegativeInfinity && expected is double.NegativeInfinity)
         {
-            return;
+            return; // Both are negative infinity, which is correct for silence
         }
 
-        if (double.IsNegativeInfinity(actual) || double.IsNegativeInfinity(expected))
+        if (actual is double.NegativeInfinity || expected is double.NegativeInfinity)
         {
             Assert.Equal(expected, actual);
         }
@@ -175,15 +176,18 @@ public static class LoudnessMeterTestsExtensions
     /// </summary>
     /// <param name="lufs1">The first loudness value.</param>
     /// <param name="lufs2">The second loudness value.</param>
-    /// <returns>The loudness difference in LU.</returns>
+    /// <returns>The loudness difference in LU, or <see cref="double.NaN"/> if either value is negative infinity.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="lufs1"/> or <paramref name="lufs2"/> is <see langword="null"/>.</exception>
     public static double LoudnessDifference(this double lufs1, double lufs2)
     {
-        if (double.IsNegativeInfinity(lufs1) || double.IsNegativeInfinity(lufs2))
+        ArgumentNullException.ThrowIfNull(lufs1);
+        ArgumentNullException.ThrowIfNull(lufs2);
+
+        if (lufs1 is double.NegativeInfinity || lufs2 is double.NegativeInfinity)
         {
             return double.NaN;
         }
 
         return lufs1 - lufs2;
     }
-
 }
