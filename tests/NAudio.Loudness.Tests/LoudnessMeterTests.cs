@@ -2,12 +2,22 @@ using Xunit;
 
 namespace NAudio.Loudness.Tests;
 
+/// <summary>
+/// Unit tests for <see cref="LoudnessMeter"/> class that verify loudness measurement behavior
+/// according to EBU R128 and ITU-R BS.1770 standards.
+/// </summary>
 public class LoudnessMeterTests
 {
+    /// <summary>
+    /// Sample rate used for all tests (48 kHz).
+    /// </summary>
     private const int Fs = 48000;
 
-    // BS.1770 reference: a full-scale 1 kHz sine reads ~-3.01 LUFS on a single
-    // channel (mean square 0.5, K-weighting ~unity at 1 kHz).
+    /// <summary>
+    /// Tests that a full-scale 1 kHz sine wave on a single mono channel measures approximately -3.01 LUFS.
+    /// This follows the BS.1770 reference where a full-scale 1 kHz sine reads ~-3.01 LUFS due to
+    /// mean square of 0.5 and K-weighting being approximately unity at 1 kHz.
+    /// </summary>
     [Fact]
     public void FullScaleSine_Mono_IsMinus3Lufs()
     {
@@ -16,7 +26,10 @@ public class LoudnessMeterTests
         Assert.Equal(-3.01, meter.IntegratedLufs, 1);
     }
 
-    // Two coherent channels sum in energy: +3.01 LU over a single channel.
+    /// <summary>
+    /// Tests that two coherent channels summing in energy results in approximately 0 LUFS.
+    /// Two coherent channels sum in energy: +3.01 LU over a single channel.
+    /// </summary>
     [Fact]
     public void FullScaleSine_Stereo_IsAboutZeroLufs()
     {
@@ -25,7 +38,10 @@ public class LoudnessMeterTests
         Assert.Equal(0.0, meter.IntegratedLufs, 1);
     }
 
-    // Halving amplitude is a clean -6.02 dB / LU shift.
+    /// <summary>
+    /// Tests that halving the amplitude of a signal results in a -6.02 LU drop.
+    /// Halving amplitude is a clean -6.02 dB / LU shift.
+    /// </summary>
     [Fact]
     public void HalvingAmplitude_DropsSixLu()
     {
@@ -36,7 +52,10 @@ public class LoudnessMeterTests
         Assert.Equal(6.02, full.IntegratedLufs - half.IntegratedLufs, 1);
     }
 
-    // EBU R128 target production loudness.
+    /// <summary>
+    /// Tests that a sine wave tuned to the EBU R128 target production loudness of -23 LUFS
+    /// measures exactly -23 LUFS.
+    /// </summary>
     [Fact]
     public void SineTunedToMinus23_MeasuresMinus23()
     {
@@ -46,6 +65,9 @@ public class LoudnessMeterTests
         Assert.Equal(-23.0, meter.IntegratedLufs, 0);
     }
 
+    /// <summary>
+    /// Tests that silence (no audio signal) results in negative infinity integrated loudness.
+    /// </summary>
     [Fact]
     public void Silence_IntegratedIsNegativeInfinity()
     {
@@ -54,7 +76,11 @@ public class LoudnessMeterTests
         Assert.Equal(double.NegativeInfinity, meter.IntegratedLufs);
     }
 
-    // Absolute gate: a short silent tail must not drag the integrated value down.
+    /// <summary>
+    /// Tests that the absolute gate correctly ignores silent sections, preventing them from
+    /// dragging down the integrated loudness value.
+    /// Absolute gate: a short silent tail must not drag the integrated value down.
+    /// </summary>
     [Fact]
     public void AbsoluteGate_IgnoresSilentSection()
     {
@@ -69,6 +95,9 @@ public class LoudnessMeterTests
             $"tone={toneOnly:0.000} withTail={meter.IntegratedLufs:0.000}");
     }
 
+    /// <summary>
+    /// Tests that momentary and short-term loudness measurements agree on a steady tone.
+    /// </summary>
     [Fact]
     public void MomentaryAndShortTerm_AgreeOnSteadyTone()
     {
@@ -77,6 +106,10 @@ public class LoudnessMeterTests
         Assert.Equal(meter.MomentaryLufs, meter.ShortTermLufs, 1);
     }
 
+    /// <summary>
+    /// Tests that insufficient audio (< 400 ms) results in negative infinity for both
+    /// momentary and short-term loudness windows.
+    /// </summary>
     [Fact]
     public void NotEnoughAudio_WindowsReturnNegativeInfinity()
     {
@@ -86,7 +119,11 @@ public class LoudnessMeterTests
         Assert.Equal(double.NegativeInfinity, meter.ShortTermLufs);
     }
 
-    // The re-derived coefficients must give the same loudness across sample rates.
+    /// <summary>
+    /// Tests that loudness measurements are independent of sample rate.
+    /// The re-derived coefficients must give the same loudness across sample rates.
+    /// </summary>
+    /// <param name="sampleRate">The sample rate to test (44100, 48000, or 96000).</param>
     [Theory]
     [InlineData(44100)]
     [InlineData(48000)]
