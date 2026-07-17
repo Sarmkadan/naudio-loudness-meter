@@ -98,6 +98,62 @@ var normalized = new LoudnessNormalizingSampleProvider(src.ToSampleProvider(), g
 WaveFileWriter.CreateWaveFile16("out.wav", normalized);
 ```
 
+## LoudnessMeterTests
+
+`LoudnessMeterTests` provides comprehensive unit tests that verify the loudness measurement behavior of the `LoudnessMeter` class according to EBU R128 and ITU-R BS.1770 standards. These tests validate fundamental audio processing assumptions and ensure measurement accuracy across different scenarios.
+
+The test suite covers:
+
+- **Reference measurements**: Full-scale sine waves at known loudness levels
+- **Channel behavior**: Mono vs stereo energy summation
+- **Amplitude scaling**: Precise loudness changes with amplitude adjustments
+- **Silence handling**: Proper gating and negative infinity values
+- **Time windowing**: Momentary, short-term, and integrated loudness windows
+- **Sample rate independence**: Measurements remain consistent across 44.1 kHz, 48 kHz, and 96 kHz
+
+
+
+```csharp
+using NAudio.Loudness;
+using NAudio.Loudness.Tests;
+using Xunit;
+
+// Initialize a meter for stereo audio at 48 kHz
+var meter = new LoudnessMeter(sampleRate: 48000, channels: 2);
+
+// Test 1: Full-scale 1 kHz sine wave should measure ~-3.01 LUFS mono
+meter.AddSamples(SignalGenerator.Sine(1000, 1.0, 48000, 4, 1));
+Assert.Equal(-3.01, meter.IntegratedLufs, 1);
+
+// Test 2: Two coherent channels summing to ~0 LUFS
+meter.Reset();
+meter.AddSamples(SignalGenerator.Sine(1000, 1.0, 48000, 4, 2));
+Assert.Equal(0.0, meter.IntegratedLufs, 1);
+
+// Test 3: Halving amplitude results in -6.02 LU drop
+var full = new LoudnessMeter(48000, 2);
+var half = new LoudnessMeter(48000, 2);
+full.AddSamples(SignalGenerator.Sine(1000, 1.0, 48000, 4, 2));
+half.AddSamples(SignalGenerator.Sine(1000, 0.5, 48000, 4, 2));
+Assert.Equal(6.02, full.IntegratedLufs - half.IntegratedLufs, 1);
+
+// Test 4: Silence results in negative infinity
+meter.Reset();
+meter.AddSamples(SignalGenerator.Silence(48000, 2, 2));
+Assert.Equal(double.NegativeInfinity, meter.IntegratedLufs);
+
+// Test 5: Sample rate independence (44.1 kHz, 48 kHz, 96 kHz)
+foreach (int rate in new[] { 44100, 48000, 96000 })
+{
+var rateMeter = new LoudnessMeter(rate, 2);
+rateMeter.AddSamples(SignalGenerator.Sine(1000, 0.5, rate, 4, 2));
+Assert.Equal(-6.0, rateMeter.IntegratedLufs, 1);
+}
+
+// Reset between test cases
+meter.Reset();
+```
+
 ## TruePeakMeterTestsExtensions
 
 `TruePeakMeterTestsExtensions` provides a set of extension methods that simplify testing scenarios involving the `TruePeakMeter` class. These methods offer convenient assertions and formatting utilities for verifying true peak and sample peak measurements during unit tests.
