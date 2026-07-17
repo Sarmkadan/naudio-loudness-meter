@@ -22,31 +22,20 @@ public static class TruePeakMeterJsonExtensions
     /// <param name="value">The true-peak meter to serialize.</param>
     /// <param name="indented">Whether to format the JSON with indentation for readability.</param>
     /// <returns>A JSON string representation of the true-peak meter.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
     public static string ToJson(this TruePeakMeter value, bool indented = false)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-
-        var options = indented
-            ? new JsonSerializerOptions(_jsonSerializerOptions)
-            {
-                WriteIndented = true
-            }
-            : _jsonSerializerOptions;
-
-        return JsonSerializer.Serialize(value, options);
-    }
+        => JsonSerializer.Serialize(value, indented ? CreateIndentedOptions() : _jsonSerializerOptions);
 
     /// <summary>
     /// Deserializes a JSON string to a <see cref="TruePeakMeter"/> instance.
     /// </summary>
     /// <param name="json">The JSON string to deserialize.</param>
-    /// <returns>The deserialized true-peak meter, or null if the JSON is null or empty.</returns>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="json"/> is null or empty.</exception>
+    /// <returns>The deserialized true-peak meter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="json"/> is empty or consists only of white-space characters.</exception>
     public static TruePeakMeter? FromJson(string json)
     {
-        ArgumentException.ThrowIfNullOrEmpty(json);
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
         return JsonSerializer.Deserialize<TruePeakMeter>(json, _jsonSerializerOptions);
     }
 
@@ -54,14 +43,15 @@ public static class TruePeakMeterJsonExtensions
     /// Attempts to deserialize a JSON string to a <see cref="TruePeakMeter"/> instance.
     /// </summary>
     /// <param name="json">The JSON string to deserialize.</param>
-    /// <param name="value">Receives the deserialized true-peak meter, or null if deserialization fails.</param>
-    /// <returns>True if deserialization succeeded; otherwise, false.</returns>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="json"/> is null or empty.</exception>
+    /// <param name="value">Receives the deserialized true-peak meter, or <see langword="null"/> if deserialization fails.</param>
+    /// <returns><see langword="true"/> if deserialization succeeded; otherwise, <see langword="false"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="json"/> is empty or consists only of white-space characters.</exception>
     public static bool TryFromJson(string json, out TruePeakMeter? value)
     {
         value = null;
 
-        if (string.IsNullOrEmpty(json))
+        if (string.IsNullOrWhiteSpace(json))
         {
             return false;
         }
@@ -75,5 +65,12 @@ public static class TruePeakMeterJsonExtensions
         {
             return false;
         }
+    }
+
+    private static JsonSerializerOptions CreateIndentedOptions()
+    {
+        var options = new JsonSerializerOptions(_jsonSerializerOptions);
+        options.WriteIndented = true;
+        return options;
     }
 }
