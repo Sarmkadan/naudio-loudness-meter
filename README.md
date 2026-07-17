@@ -45,6 +45,33 @@ Console.WriteLine(result); // Integrated: -18.4 LUFS, LRA: 7.1 LU, True peak: -0
 double gain = result.GainToReach(-23.0); // EBU R128 delivery target
 ```
 
+## LoudnessMeter
+
+`LoudnessMeter` provides real-time loudness metering by incrementally processing audio samples. It implements the EBU R128 / ITU-R BS.1770 algorithms with K-weighting and gated integrated loudness calculation. The meter maintains momentary, short-term, and integrated loudness measurements, along with loudness range (LRA) and true peak values.
+
+Create an instance with your audio format's sample rate and channel count, feed it samples via `AddSamples()`, and read the current loudness metrics whenever needed (e.g., to update a UI meter). Call `Reset()` between programs or tracks to clear the integrated loudness history.
+
+```csharp
+using NAudio.Loudness;
+using NAudio.Wave;
+
+// Initialize with the audio format's sample rate and channels
+var meter = new LoudnessMeter(sampleRate: 48000, channels: 2);
+
+// Feed audio samples as they arrive (interleaved float array)
+meter.AddSamples(audioBuffer.AsSpan());
+
+// Read current loudness measurements
+Console.WriteLine($"Momentary: {meter.MomentaryLufs:0.0} LUFS, " +
+                $"Short-term: {meter.ShortTermLufs:0.0} LUFS, " +
+                $"Integrated: {meter.IntegratedLufs:0.0} LUFS, " +
+                $"LRA: {meter.LoudnessRange:0.0} LU, " +
+                $"True peak: {meter.TruePeakDb:0.0} dBTP");
+
+// Reset between programs/tracks
+meter.Reset();
+```
+
 ### Live/streaming metering
 
 `LoudnessMeter` is incremental - push buffers as they arrive (e.g. from a
