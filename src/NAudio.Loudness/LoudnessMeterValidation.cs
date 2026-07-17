@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 
 namespace NAudio.Loudness;
 
@@ -11,10 +10,10 @@ namespace NAudio.Loudness;
 public static class LoudnessMeterValidation
 {
     /// <summary>
-    /// Returns a read‑only list of validation problems for the supplied <see cref="LoudnessMeter"/>.
+    /// Returns a read-only list of validation problems for the supplied <see cref="LoudnessMeter"/>.
     /// </summary>
     /// <param name="value">The meter to validate.</param>
-    /// <returns>A read‑only list of human‑readable problem descriptions. The list is empty when the instance is valid.</returns>
+    /// <returns>A read-only list of human-readable problem descriptions. The list is empty when the instance is valid.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is <c>null</c>.</exception>
     public static IReadOnlyList<string> Validate(this LoudnessMeter value)
     {
@@ -29,7 +28,6 @@ public static class LoudnessMeterValidation
                 "SampleRate must be greater than zero, but was {0}.", value.SampleRate));
         }
 
-        // No other public members expose state that can be validated.
         return problems;
     }
 
@@ -39,8 +37,7 @@ public static class LoudnessMeterValidation
     /// <param name="value">The meter to validate.</param>
     /// <returns><c>true</c> if the meter has no validation problems; otherwise, <c>false</c>.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is <c>null</c>.</exception>
-    public static bool IsValid(this LoudnessMeter value) =>
-        value.Validate().Count == 0;
+    public static bool IsValid(this LoudnessMeter value) => value.Validate().Count == 0;
 
     /// <summary>
     /// Ensures that the supplied <see cref="LoudnessMeter"/> is valid.
