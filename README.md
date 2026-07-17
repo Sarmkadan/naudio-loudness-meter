@@ -98,6 +98,45 @@ var normalized = new LoudnessNormalizingSampleProvider(src.ToSampleProvider(), g
 WaveFileWriter.CreateWaveFile16("out.wav", normalized);
 ```
 
+## TruePeakMeterTestsExtensions
+
+`TruePeakMeterTestsExtensions` provides a set of extension methods that simplify testing scenarios involving the `TruePeakMeter` class. These methods offer convenient assertions and formatting utilities for verifying true peak and sample peak measurements during unit tests.
+
+```csharp
+using NAudio.Loudness;
+using NAudio.Loudness.Tests;
+
+// Create a true peak meter for stereo audio
+var meter = 2.CreateMeter();
+
+// Feed some test samples (e.g., a sine wave at -6 dBFS)
+float[] buffer = new float[1024];
+for (int i = 0; i < buffer.Length; i++)
+{
+    buffer[i] = 0.5f; // -6 dBFS sine wave
+}
+meter.AddSamples(buffer);
+
+// Assert that true peak is within expected range
+meter.AssertTruePeakInRange(-6.1, -5.9);
+
+// Assert that sample peak is within expected range  
+meter.AssertSamplePeakInRange(-6.1, -5.9);
+
+// Assert that true peak exceeds sample peak by at least 0.1 dB
+meter.AssertTruePeakExceedsSamplePeakBy(0.1);
+
+// Get formatted peak values
+string truePeakStr = meter.GetTruePeakString();
+string samplePeakStr = meter.GetSamplePeakString();
+
+// Get linear true peak value (1.0 == 0 dBTP)
+double truePeakLinear = meter.GetTruePeakLinear();
+
+// Reset the meter for the next test case
+meter.Reset();
+```
+
 ## CLI
 
 The `loudness` tool wraps the library for quick checks:
