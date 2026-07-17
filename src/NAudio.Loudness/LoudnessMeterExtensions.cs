@@ -31,8 +31,9 @@ public static class LoudnessMeterExtensions
     /// </summary>
     /// <param name="meter">The loudness meter instance.</param>
     /// <param name="format">Optional format string for numeric values (default: "0.0").</param>
-    /// <returns>A formatted status string.</returns>
+    /// <returns>A formatted status string with loudness measurements in LUFS.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="meter"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="format"/> is <see langword="null"/> or empty.</exception>
     public static string GetCurrentLufsStatus(
         this LoudnessMeter meter,
         string format = "0.0")
@@ -58,10 +59,10 @@ public static class LoudnessMeterExtensions
     }
 
     /// <summary>
-    /// Gets the loudness range (LRA) measurement.
+    /// Gets the loudness range (LRA) measurement in loudness units.
     /// </summary>
     /// <param name="meter">The loudness meter instance.</param>
-    /// <returns>The loudness range in LU, or 0 if not enough data.</returns>
+    /// <returns>The loudness range in LU, or 0 if not enough data is available.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="meter"/> is <see langword="null"/>.</exception>
     public static double GetLoudnessRange(this LoudnessMeter meter)
     {
