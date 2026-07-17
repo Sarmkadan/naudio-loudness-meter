@@ -26,3 +26,6 @@ samples/*.wav
 # OS
 .DS_Store
 Thumbs.db
+TestResults/
+BenchmarkDotNet.Artifacts/
+.aider*
