@@ -41,14 +41,11 @@ public static class TruePeakMeterTestsJsonExtensions
     /// <param name="json">The JSON string to deserialize.</param>
     /// <returns>The deserialized <see cref="TruePeakMeterTests"/> instance, or null if the JSON is null or empty.</returns>
     /// <exception cref="JsonException">Thrown if the JSON is invalid or cannot be deserialized.</exception>
-    public static TruePeakMeterTests? FromJson(string json)
+    public static TruePeakMeterTests? FromJson(string? json)
     {
-        if (string.IsNullOrEmpty(json))
-        {
-            return null;
-        }
-
-        return JsonSerializer.Deserialize<TruePeakMeterTests>(json, _jsonOptions);
+        return string.IsNullOrEmpty(json)
+            ? null
+            : JsonSerializer.Deserialize<TruePeakMeterTests>(json, _jsonOptions);
     }
 
     /// <summary>
@@ -57,23 +54,25 @@ public static class TruePeakMeterTestsJsonExtensions
     /// <param name="json">The JSON string to deserialize.</param>
     /// <param name="value">Receives the deserialized value if successful.</param>
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
-    public static bool TryFromJson(string json, out TruePeakMeterTests? value)
+    public static bool TryFromJson(string? json, out TruePeakMeterTests? value)
     {
         value = null;
 
-        if (string.IsNullOrEmpty(json))
-        {
-            return false;
-        }
+        return !string.IsNullOrEmpty(json)
+            && TryDeserialize(json, out value);
 
-        try
+        static bool TryDeserialize(string jsonToParse, out TruePeakMeterTests? result)
         {
-            value = JsonSerializer.Deserialize<TruePeakMeterTests>(json, _jsonOptions);
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
+            try
+            {
+                result = JsonSerializer.Deserialize<TruePeakMeterTests>(jsonToParse, _jsonOptions);
+                return true;
+            }
+            catch (JsonException)
+            {
+                result = null;
+                return false;
+            }
         }
     }
 }
