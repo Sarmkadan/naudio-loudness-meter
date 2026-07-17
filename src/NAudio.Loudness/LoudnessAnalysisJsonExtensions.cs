@@ -69,7 +69,7 @@ public static class LoudnessAnalysisJsonExtensions
 
         try
         {
-            value = JsonSerializer.Deserialize<LoudnessAnalysis>(json, _jsonSerializerOptions)!;
+            value = JsonSerializer.Deserialize<LoudnessAnalysis>(json, _jsonSerializerOptions);
             return true;
         }
         catch (JsonException)
