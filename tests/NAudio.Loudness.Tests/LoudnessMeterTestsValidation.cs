@@ -1,14 +1,29 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Reflection;
 
 namespace NAudio.Loudness.Tests
 {
     /// <summary>
     /// Validation helpers for <see cref="LoudnessMeterTests"/>.
+    /// Validates that all expected test methods exist and are properly defined in the <see cref="LoudnessMeterTests"/> class.
     /// </summary>
     public static class LoudnessMeterTestsValidation
     {
+        private static readonly IReadOnlyList<string> ExpectedTestMethods = new List<string>
+        {
+            nameof(LoudnessMeterTests.FullScaleSine_Mono_IsMinus3Lufs),
+            nameof(LoudnessMeterTests.FullScaleSine_Stereo_IsAboutZeroLufs),
+            nameof(LoudnessMeterTests.HalvingAmplitude_DropsSixLu),
+            nameof(LoudnessMeterTests.SineTunedToMinus23_MeasuresMinus23),
+            nameof(LoudnessMeterTests.Silence_IntegratedIsNegativeInfinity),
+            nameof(LoudnessMeterTests.AbsoluteGate_IgnoresSilentSection),
+            nameof(LoudnessMeterTests.MomentaryAndShortTerm_AgreeOnSteadyTone),
+            nameof(LoudnessMeterTests.NotEnoughAudio_WindowsReturnNegativeInfinity),
+            nameof(LoudnessMeterTests.SampleRateIndependent_WithinTolerance)
+        };
+
         /// <summary>
         /// Validates the given <paramref name="value"/> and returns a list of human-readable problems.
         /// </summary>
@@ -20,54 +35,24 @@ namespace NAudio.Loudness.Tests
             ArgumentNullException.ThrowIfNull(value);
 
             var problems = new List<string>();
+            var type = typeof(LoudnessMeterTests);
 
-            // Since LoudnessMeterTests only contains methods and no properties, 
-            // there's nothing to validate in terms of null/empty strings or out-of-range numbers.
-            // However, we can still validate that the methods are not null.
-
-            if (value.FullScaleSine_Mono_IsMinus3Lufs == null)
+            foreach (var methodName in ExpectedTestMethods)
             {
-                problems.Add("FullScaleSine_Mono_IsMinus3Lufs is null");
-            }
+                var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
 
-            if (value.FullScaleSine_Stereo_IsAboutZeroLufs == null)
-            {
-                problems.Add("FullScaleSine_Stereo_IsAboutZeroLufs is null");
-            }
-
-            if (value.HalvingAmplitude_DropsSixLu == null)
-            {
-                problems.Add("HalvingAmplitude_DropsSixLu is null");
-            }
-
-            if (value.SineTunedToMinus23_MeasuresMinus23 == null)
-            {
-                problems.Add("SineTunedToMinus23_MeasuresMinus23 is null");
-            }
-
-            if (value.Silence_IntegratedIsNegativeInfinity == null)
-            {
-                problems.Add("Silence_IntegratedIsNegativeInfinity is null");
-            }
-
-            if (value.AbsoluteGate_IgnoresSilentSection == null)
-            {
-                problems.Add("AbsoluteGate_IgnoresSilentSection is null");
-            }
-
-            if (value.MomentaryAndShortTerm_AgreeOnSteadyTone == null)
-            {
-                problems.Add("MomentaryAndShortTerm_AgreeOnSteadyTone is null");
-            }
-
-            if (value.NotEnoughAudio_WindowsReturnNegativeInfinity == null)
-            {
-                problems.Add("NotEnoughAudio_WindowsReturnNegativeInfinity is null");
-            }
-
-            if (value.SampleRateIndependent_WithinTolerance == null)
-            {
-                problems.Add("SampleRateIndependent_WithinTolerance is null");
+                if (method == null)
+                {
+                    problems.Add($"Test method '{methodName}' is missing from {type.Name}");
+                }
+                else if (method.ReturnType != typeof(void))
+                {
+                    problems.Add($"Test method '{methodName}' has incorrect return type. Expected: void, Actual: {method.ReturnType.Name}");
+                }
+                else if (!method.IsPublic)
+                {
+                    problems.Add($"Test method '{methodName}' is not public");
+                }
             }
 
             return new ReadOnlyCollection<string>(problems);
