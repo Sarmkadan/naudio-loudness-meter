@@ -41,19 +41,22 @@ static int Scan(string[] a)
             momentaryMax = result.IntegratedLufs, // Note: momentaryMax is not directly available, using IntegratedLufs as a substitute
             shortTermMax = result.IntegratedLufs, // Note: shortTermMax is not directly available, using IntegratedLufs as a substitute
             loudnessRange = result.LoudnessRange,
-            truePeakDbtp = result.TruePeakDb
+            truePeakDbtp = result.TruePeakDb,
+            totalBlockCount = result.TotalBlockCount,
+            gatedBlockCount = result.GatedBlockCount
         };
         Console.WriteLine(JsonSerializer.Serialize(json, new JsonSerializerOptions { WriteIndented = true }));
     }
     else
     {
-        Console.WriteLine($"File:          {Path.GetFileName(a[0])}");
-        Console.WriteLine($"Format:        {reader.WaveFormat.SampleRate} Hz, {reader.WaveFormat.Channels} ch");
-        Console.WriteLine($"Integrated:    {Fmt(result.IntegratedLufs)} LUFS");
+        Console.WriteLine($"File: {Path.GetFileName(a[0])}");
+        Console.WriteLine($"Format: {reader.WaveFormat.SampleRate} Hz, {reader.WaveFormat.Channels} ch");
+        Console.WriteLine($"Integrated: {Fmt(result.IntegratedLufs)} LUFS");
         Console.WriteLine($"Loudness range:{result.LoudnessRange,7:0.0} LU");
-        Console.WriteLine($"True peak:     {Fmt(result.TruePeakDb)} dBTP");
-        Console.WriteLine($"Sample peak:   {Fmt(result.SamplePeakDb)} dBFS");
-        Console.WriteLine($"Gain to -23:   {SignedLu(result.GainToReach(-23.0))} LU");
+        Console.WriteLine($"True peak: {Fmt(result.TruePeakDb)} dBTP");
+        Console.WriteLine($"Sample peak: {Fmt(result.SamplePeakDb)} dBFS");
+        Console.WriteLine($"Gain to -23: {SignedLu(result.GainToReach(-23.0))} LU");
+        Console.WriteLine($"Gating stats: {result.GatedBlockCount} blocks survived absolute gate, {result.TotalBlockCount} blocks total");
     }
     return 0;
 }
@@ -89,7 +92,7 @@ static int Normalize(string[] a)
     return 0;
 }
 
-static string Fmt(double v) => double.IsNegativeInfinity(v) ? "  -inf" : $"{v,7:0.0}";
+static string Fmt(double v) => double.IsNegativeInfinity(v) ? " -inf" : $"{v,7:0.0}";
 
 static string SignedLu(double v) => (v >= 0 ? "+" : "") + v.ToString("0.0");
 
@@ -97,6 +100,6 @@ static void PrintUsage()
 {
     Console.WriteLine("loudness - EBU R128 / BS.1770 metering for NAudio");
     Console.WriteLine();
-    Console.WriteLine("  loudness scan <input.wav> [--json]");
-    Console.WriteLine("  loudness normalize <input.wav> <output.wav> [targetLufs=-23] [ceilingDbtp=-1]");
+    Console.WriteLine(" loudness scan <input.wav> [--json]");
+    Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23] [ceilingDbtp=-1]");
 }

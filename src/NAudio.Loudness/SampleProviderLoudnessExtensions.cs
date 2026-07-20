@@ -37,6 +37,8 @@ public static class SampleProviderLoudnessExtensions
             meter.IntegratedLufs,
             meter.LoudnessRange,
             peak.TruePeakDb,
-            peak.SamplePeakDb);
+            peak.SamplePeakDb,
+            meter.TotalBlockCount,
+            meter.GatedBlockCount);
     }
 }

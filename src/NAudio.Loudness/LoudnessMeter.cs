@@ -38,6 +38,9 @@ public sealed class LoudnessMeter
     // passed the absolute gate, together with its loudness.
     private readonly List<double[]> _gatingBlockEnergy = new();
 
+    // Total count of 400ms blocks that entered the gating computation
+    private int _totalBlockCount = 0;
+
     public LoudnessMeter(int sampleRate, int channels)
         : this(sampleRate, channels, ChannelWeights.ForChannelCount(channels))
     {
@@ -96,6 +99,7 @@ public sealed class LoudnessMeter
         if (_subBlocks.Count >= MomentaryBlocks)
         {
             var energy = AverageEnergy(_subBlocks.Count - MomentaryBlocks, MomentaryBlocks);
+            _totalBlockCount++;
             if (LoudnessFromEnergy(energy) >= AbsoluteGateLufs)
                 _gatingBlockEnergy.Add(energy);
         }
@@ -140,12 +144,23 @@ public sealed class LoudnessMeter
     /// <summary>Loudness range (LRA) in LU per EBU Tech 3342, from short-term history.</summary>
     public double LoudnessRange => ComputeLoudnessRange();
 
+    /// <summary>
+    /// Total count of 400ms blocks that entered the gating computation (both passed and failed absolute gate).
+    /// </summary>
+    public int TotalBlockCount => _totalBlockCount;
+
+    /// <summary>
+    /// Count of 400ms blocks that survived the absolute gate (-70 LUFS) and are used for relative gating computation.
+    /// </summary>
+    public int GatedBlockCount => _gatingBlockEnergy.Count;
+
     public void Reset()
     {
         Array.Clear(_sumSquares);
         _subBlockSampleCount = 0;
         _subBlocks.Clear();
         _gatingBlockEnergy.Clear();
+        _totalBlockCount = 0;
         foreach (var f in _filters) f.Reset();
     }
 
