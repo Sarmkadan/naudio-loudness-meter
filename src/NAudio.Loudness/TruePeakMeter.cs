@@ -14,6 +14,7 @@ public sealed class TruePeakMeter
     private readonly double[][] _phases;      // [phase][tap]
     private readonly double[][] _history;     // [channel][tap] circular delay line
     private readonly int[] _pos;
+    private readonly double[] _channelTruePeaks;
 
     private double _truePeak;
     private double _samplePeak;
@@ -25,6 +26,7 @@ public sealed class TruePeakMeter
         _phases = BuildPolyphase();
         _history = new double[channels][];
         _pos = new int[channels];
+        _channelTruePeaks = new double[channels];
         for (int c = 0; c < channels; c++)
             _history[c] = new double[TapsPerPhase];
     }
@@ -65,11 +67,24 @@ public sealed class TruePeakMeter
             }
             double a = Math.Abs(acc);
             if (a > _truePeak) _truePeak = a;
+            if (a > _channelTruePeaks[channel]) _channelTruePeaks[channel] = a;
         }
     }
 
     /// <summary>Estimated true-peak level in dBTP.</summary>
     public double TruePeakDb => LinearToDb(_truePeak);
+
+    /// <summary>Estimated per-channel true-peak level in dBTP.</summary>
+    public IReadOnlyList<double> ChannelPeaksDbtp
+    {
+        get
+        {
+            var result = new double[_channels];
+            for (int i = 0; i < _channels; i++)
+                result[i] = LinearToDb(_channelTruePeaks[i]);
+            return result;
+        }
+    }
 
     /// <summary>Plain sample-peak level in dBFS.</summary>
     public double SamplePeakDb => LinearToDb(_samplePeak);
@@ -82,6 +97,7 @@ public sealed class TruePeakMeter
         _truePeak = 0.0;
         _samplePeak = 0.0;
         Array.Clear(_pos);
+        Array.Clear(_channelTruePeaks);
         foreach (var h in _history) Array.Clear(h);
     }
 

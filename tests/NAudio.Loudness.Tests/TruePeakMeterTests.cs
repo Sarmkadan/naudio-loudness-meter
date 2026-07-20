@@ -56,6 +56,26 @@ public class TruePeakMeterTests
         Assert.InRange(meter.TruePeakDb, -1.0, 0.5);
     }
 
+    [Fact]
+    public void ChannelPeaks_TracksIndependently()
+    {
+        var meter = new TruePeakMeter(2);
+        // Left channel: full scale
+        // Right channel: -6 dB
+        float[] samples = new float[2000];
+        for (int i = 0; i < 1000; i++)
+        {
+            samples[i * 2] = (float)Math.Sin(2 * Math.PI * 1000 * i / Fs);
+            samples[i * 2 + 1] = (float)(0.5 * Math.Sin(2 * Math.PI * 1000 * i / Fs));
+        }
+        meter.AddSamples(samples);
+
+        var peaks = meter.ChannelPeaksDbtp;
+        Assert.Equal(2, peaks.Count);
+        Assert.InRange(peaks[0], -0.5, 0.5); // Approx 0 dBTP
+        Assert.InRange(peaks[1], -6.5, -5.5); // Approx -6 dBTP
+    }
+
     /// <summary>
     /// Tests that the TruePeakMeter correctly measures the true peak of silence.
     /// </summary>
