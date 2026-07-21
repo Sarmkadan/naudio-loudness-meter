@@ -118,12 +118,30 @@ static int Normalize(string[] a)
 {
     if (a.Length < 2)
     {
-        Console.Error.WriteLine("usage: loudness normalize <input.wav> <output.wav> [targetLufs=-23] [ceilingDbtp=-1]");
+        Console.Error.WriteLine("usage: loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1]");
         return 1;
     }
 
     string input = a[0], output = a[1];
-    double target = a.Length > 2 ? double.Parse(a[2]) : -23.0;
+    
+    double target;
+    if (a.Length > 2)
+    {
+        string t = a[2].ToLower();
+        if (t == "spotify" || t == "youtube") target = -14.0;
+        else if (t == "ebu") target = -23.0;
+        else if (t == "podcast") target = -16.0;
+        else if (!double.TryParse(t, out target))
+        {
+            Console.Error.WriteLine($"Invalid target: '{t}'. Must be a number or one of: spotify, ebu, youtube, podcast.");
+            return 1;
+        }
+    }
+    else
+    {
+        target = -23.0;
+    }
+    
     double ceiling = a.Length > 3 ? double.Parse(a[3]) : -1.0;
 
     double gain;
@@ -154,7 +172,7 @@ static void PrintUsage()
     Console.WriteLine("loudness - EBU R128 / BS.1770 metering for NAudio");
     Console.WriteLine();
     Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json]");
-    Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23] [ceilingDbtp=-1]");
+    Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1]");
 }
 
 // Custom JSON converter to handle negative infinity values
