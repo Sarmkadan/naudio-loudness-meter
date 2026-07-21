@@ -7,7 +7,7 @@ namespace NAudio.Loudness.Filters;
 /// stays valid at 44.1 kHz, 96 kHz, etc. (the fixed tables in the spec are only
 /// exact at 48 kHz).
 /// </summary>
-internal sealed class KWeightingFilter
+public sealed class KWeightingFilter
 {
     private readonly Biquad _shelf;
     private readonly Biquad _highpass;
