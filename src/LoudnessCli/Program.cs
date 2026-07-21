@@ -4,6 +4,8 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Collections.Generic;
+using System.Linq;
 
 // Custom JSON converter to handle negative infinity values
 public class JsonLoudnessConverter : JsonConverter<double>
@@ -84,24 +86,28 @@ static int Scan(string[] a)
 
     if (jsonOutput)
     {
-        var jsonResults = results.Select(r => new
+        // Build a single JSON object where each property is the file name
+        // and its value is an object containing the full analysis.
+        var jsonObject = new Dictionary<string, object>();
+        for (int i = 0; i < files.Count; i++)
         {
-            file = Path.GetFileName(r.ToString()),
-            integratedLufs = r.IntegratedLufs,
-            momentaryMax = r.MomentaryMax,
-            shortTermMax = r.ShortTermMax,
-            loudnessRange = r.LoudnessRange,
-            truePeakDbtp = r.TruePeakDb,
-            samplePeakDbfs = r.SamplePeakDb,
-            totalBlockCount = r.TotalBlockCount,
-            gatedBlockCount = r.GatedBlockCount
-        });
+            var r = results[i];
+            var fileName = Path.GetFileName(files[i]);
+            jsonObject[fileName] = new
+            {
+                integratedLufs = r.IntegratedLufs,
+                momentaryMax = r.MomentaryMax,
+                shortTermMax = r.ShortTermMax,
+                truePeakDb = r.TruePeakDb
+            };
+        }
+
         var options = new JsonSerializerOptions
         {
             WriteIndented = true,
             Converters = { new JsonLoudnessConverter() }
         };
-        Console.WriteLine(JsonSerializer.Serialize(jsonResults, options));
+        Console.WriteLine(JsonSerializer.Serialize(jsonObject, options));
     }
     else
     {
