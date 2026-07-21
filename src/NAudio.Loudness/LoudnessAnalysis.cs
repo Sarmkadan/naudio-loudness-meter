@@ -6,6 +6,8 @@ public sealed record LoudnessAnalysis(
     double LoudnessRange,
     double TruePeakDb,
     double SamplePeakDb,
+    double MomentaryMax,
+    double ShortTermMax,
     int TotalBlockCount = 0,
     int GatedBlockCount = 0)
 {
@@ -19,5 +21,6 @@ public sealed record LoudnessAnalysis(
     public override string ToString() =>
         $"Integrated: {IntegratedLufs:0.0} LUFS, LRA: {LoudnessRange:0.0} LU, " +
         $"True peak: {TruePeakDb:0.0} dBTP, Sample peak: {SamplePeakDb:0.0} dBFS, " +
+        $"Momentary: {MomentaryMax:0.0} LUFS, Short-term: {ShortTermMax:0.0} LUFS, " +
         $"Blocks: {GatedBlockCount}/{TotalBlockCount}";
 }

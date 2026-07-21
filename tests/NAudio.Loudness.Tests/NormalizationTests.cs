@@ -36,7 +36,7 @@ public class NormalizationTests
     [Fact]
     public void GainToReach_ComputesDelta()
     {
-        var analysis = new LoudnessAnalysis(-30.0, 5.0, -12.0, -13.0);
+        var analysis = new LoudnessAnalysis(-30.0, 5.0, -12.0, -13.0, -30.0, -25.0);
         Assert.Equal(7.0, analysis.GainToReach(-23.0), 5);
     }
 
