@@ -7,21 +7,6 @@ using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using System.Linq;
 
-// Custom JSON converter to handle negative infinity values
-public class JsonLoudnessConverter : JsonConverter<double>
-{
-    public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        => reader.GetDouble();
-
-    public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
-    {
-        if (double.IsNegativeInfinity(value))
-            writer.WriteStringValue("-inf");
-        else
-            writer.WriteNumberValue(value);
-    }
-}
-
 if (args.Length == 0 || args[0] is "-h" or "--help")
 {
     PrintUsage();
@@ -170,4 +155,19 @@ static void PrintUsage()
     Console.WriteLine();
     Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json]");
     Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23] [ceilingDbtp=-1]");
+}
+
+// Custom JSON converter to handle negative infinity values
+public class JsonLoudnessConverter : JsonConverter<double>
+{
+    public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.GetDouble();
+
+    public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
+    {
+        if (double.IsNegativeInfinity(value))
+            writer.WriteStringValue("-inf");
+        else
+            writer.WriteNumberValue(value);
+    }
 }
