@@ -1,5 +1,7 @@
 using NAudio.Loudness;
 using NAudio.Wave;
+using System;
+using System.IO;
 using System.Text.Json;
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -24,39 +26,77 @@ static int Scan(string[] a)
 {
     if (a.Length < 1)
     {
-        Console.Error.WriteLine("usage: loudness scan <input.wav>");
+        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory>");
         return 1;
     }
 
     bool jsonOutput = a.Contains("--json");
 
-    using var reader = new AudioFileReader(a[0]);
-    var result = reader.ToSampleProvider().MeasureLoudness();
+    var files = new List<string>();
+    foreach (var arg in a)
+    {
+        if (Directory.Exists(arg))
+        {
+            files.AddRange(Directory.EnumerateFiles(arg, "*.wav", SearchOption.AllDirectories));
+        }
+        else if (File.Exists(arg))
+        {
+            files.Add(arg);
+        }
+    }
+
+    if (files.Count == 0)
+    {
+        Console.Error.WriteLine("No files found.");
+        return 1;
+    }
+
+    var results = new List<LoudnessAnalysis>();
+    foreach (var file in files)
+    {
+        try
+        {
+            using var reader = new AudioFileReader(file);
+            var result = reader.ToSampleProvider().MeasureLoudness();
+            results.Add(result);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error processing {file}: {ex.Message}");
+        }
+    }
 
     if (jsonOutput)
     {
-        var json = new
+        var jsonResults = results.Select(r => new
         {
-            integratedLufs = result.IntegratedLufs,
-            momentaryMax = result.IntegratedLufs, // Note: momentaryMax is not directly available, using IntegratedLufs as a substitute
-            shortTermMax = result.IntegratedLufs, // Note: shortTermMax is not directly available, using IntegratedLufs as a substitute
-            loudnessRange = result.LoudnessRange,
-            truePeakDbtp = result.TruePeakDb,
-            totalBlockCount = result.TotalBlockCount,
-            gatedBlockCount = result.GatedBlockCount
-        };
-        Console.WriteLine(JsonSerializer.Serialize(json, new JsonSerializerOptions { WriteIndented = true }));
+            file = Path.GetFileName(r.ToString()),
+            integratedLufs = r.IntegratedLufs,
+            momentaryMax = r.IntegratedLufs, // Note: momentaryMax is not directly available, using IntegratedLufs as a substitute
+            shortTermMax = r.IntegratedLufs, // Note: shortTermMax is not directly available, using IntegratedLufs as a substitute
+            loudnessRange = r.LoudnessRange,
+            truePeakDbtp = r.TruePeakDb,
+            totalBlockCount = r.TotalBlockCount,
+            gatedBlockCount = r.GatedBlockCount
+        });
+        Console.WriteLine(JsonSerializer.Serialize(jsonResults, new JsonSerializerOptions { WriteIndented = true }));
     }
     else
     {
-        Console.WriteLine($"File: {Path.GetFileName(a[0])}");
-        Console.WriteLine($"Format: {reader.WaveFormat.SampleRate} Hz, {reader.WaveFormat.Channels} ch");
-        Console.WriteLine($"Integrated: {Fmt(result.IntegratedLufs)} LUFS");
-        Console.WriteLine($"Loudness range:{result.LoudnessRange,7:0.0} LU");
-        Console.WriteLine($"True peak: {Fmt(result.TruePeakDb)} dBTP");
-        Console.WriteLine($"Sample peak: {Fmt(result.SamplePeakDb)} dBFS");
-        Console.WriteLine($"Gain to -23: {SignedLu(result.GainToReach(-23.0))} LU");
-        Console.WriteLine($"Gating stats: {result.GatedBlockCount} blocks survived absolute gate, {result.TotalBlockCount} blocks total");
+        Console.WriteLine("File\tIntegrated LUFS\tLoudness Range LU\tTrue Peak dBTP");
+        double sumIntegratedLufs = 0;
+        double sumLoudnessRange = 0;
+        double sumTruePeakDb = 0;
+        int count = 0;
+        foreach (var result in results)
+        {
+            Console.WriteLine($"{Path.GetFileName(result.ToString())}\t{Fmt(result.IntegratedLufs)}\t{result.LoudnessRange,7:0.0}\t{Fmt(result.TruePeakDb)}");
+            sumIntegratedLufs += result.IntegratedLufs;
+            sumLoudnessRange += result.LoudnessRange;
+            sumTruePeakDb += result.TruePeakDb;
+            count++;
+        }
+        Console.WriteLine($"Summary\t{Fmt(sumIntegratedLufs / count)}\t{sumLoudnessRange / count,7:0.0}\t{Fmt(sumTruePeakDb / count)}");
     }
     return 0;
 }
@@ -100,6 +140,6 @@ static void PrintUsage()
 {
     Console.WriteLine("loudness - EBU R128 / BS.1770 metering for NAudio");
     Console.WriteLine();
-    Console.WriteLine(" loudness scan <input.wav> [--json]");
+    Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json]");
     Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23] [ceilingDbtp=-1]");
 }
