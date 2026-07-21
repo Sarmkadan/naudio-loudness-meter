@@ -3,6 +3,22 @@ using NAudio.Wave;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+
+// Custom JSON converter to handle negative infinity values
+public class JsonLoudnessConverter : JsonConverter<double>
+{
+    public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.GetDouble();
+
+    public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
+    {
+        if (double.IsNegativeInfinity(value))
+            writer.WriteStringValue("-inf");
+        else
+            writer.WriteNumberValue(value);
+    }
+}
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
 {
@@ -26,7 +42,7 @@ static int Scan(string[] a)
 {
     if (a.Length < 1)
     {
-        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory>");
+        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory> [--json]");
         return 1;
     }
 
@@ -72,14 +88,20 @@ static int Scan(string[] a)
         {
             file = Path.GetFileName(r.ToString()),
             integratedLufs = r.IntegratedLufs,
-            momentaryMax = r.IntegratedLufs, // Note: momentaryMax is not directly available, using IntegratedLufs as a substitute
-            shortTermMax = r.IntegratedLufs, // Note: shortTermMax is not directly available, using IntegratedLufs as a substitute
+            momentaryMax = r.MomentaryMax,
+            shortTermMax = r.ShortTermMax,
             loudnessRange = r.LoudnessRange,
             truePeakDbtp = r.TruePeakDb,
+            samplePeakDbfs = r.SamplePeakDb,
             totalBlockCount = r.TotalBlockCount,
             gatedBlockCount = r.GatedBlockCount
         });
-        Console.WriteLine(JsonSerializer.Serialize(jsonResults, new JsonSerializerOptions { WriteIndented = true }));
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters = { new JsonLoudnessConverter() }
+        };
+        Console.WriteLine(JsonSerializer.Serialize(jsonResults, options));
     }
     else
     {
