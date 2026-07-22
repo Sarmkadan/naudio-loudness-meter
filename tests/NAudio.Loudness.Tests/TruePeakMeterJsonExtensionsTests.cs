@@ -90,19 +90,6 @@ public class TruePeakMeterJsonExtensionsTests
     }
 
     /// <summary>
-    /// Tests that FromJson returns null for null JSON string.
-    /// </summary>
-    [Fact]
-    public void FromJson_NullJson_ReturnsNull()
-    {
-        // Act
-        var result = TruePeakMeterJsonExtensions.FromJson(null!);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    /// <summary>
     /// Tests that FromJson throws ArgumentNullException for null JSON.
     /// </summary>
     [Fact]
@@ -164,14 +151,17 @@ public class TruePeakMeterJsonExtensionsTests
     }
 
     /// <summary>
-    /// Tests that TryFromJson returns false for null JSON.
+    /// Tests that TryFromJson returns false for null JSON (no exception thrown).
     /// </summary>
     [Fact]
-    public void TryFromJson_NullJson_ThrowsArgumentNullException()
+    public void TryFromJson_NullJson_ReturnsFalse()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(
-            () => TruePeakMeterJsonExtensions.TryFromJson(null!, out _));
+        // Act
+        var result = TruePeakMeterJsonExtensions.TryFromJson(null!, out var meter);
+
+        // Assert
+        Assert.False(result);
+        Assert.Null(meter);
     }
 
     /// <summary>
