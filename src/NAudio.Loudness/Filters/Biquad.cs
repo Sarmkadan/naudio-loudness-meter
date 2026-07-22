@@ -4,7 +4,7 @@ namespace NAudio.Loudness.Filters;
 /// Direct-form I biquad section operating on <see cref="double"/> samples.
 /// State is kept per instance, so one section maps to exactly one channel.
 /// </summary>
-internal sealed class Biquad
+public sealed class Biquad
 {
     private readonly double _b0, _b1, _b2, _a1, _a2;
     private double _x1, _x2, _y1, _y2;
