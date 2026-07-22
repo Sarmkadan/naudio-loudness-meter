@@ -29,11 +29,12 @@ static int Scan(string[] a)
 {
     if (a.Length < 1)
     {
-        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory> [--json]");
+        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet]");
         return 1;
     }
 
     bool jsonOutput = a.Contains("--json");
+    bool quiet = a.Contains("--quiet");
 
     var files = new List<string>();
     foreach (var arg in a)
@@ -60,8 +61,22 @@ static int Scan(string[] a)
         try
         {
             using var reader = new AudioFileReader(file);
-            var result = reader.ToSampleProvider().MeasureLoudness();
+            var duration = reader.TotalTime;
+            var showProgress = !quiet && duration.TotalSeconds > 10;
+
+            if (showProgress)
+            {
+                Console.Error.Write($"Processing {Path.GetFileName(file)} ({duration:mm\\:ss}/{duration:mm\\:ss})... 0%");
+            }
+
+            // Measure loudness with progress tracking
+            var result = MeasureLoudnessWithProgress(reader, showProgress, Path.GetFileName(file), duration, quiet);
             results.Add(result);
+
+            if (showProgress)
+            {
+                Console.Error.Write($"\rProcessing {Path.GetFileName(file)} ({duration:mm\\:ss}/{duration:mm\\:ss})... 100%\n");
+            }
         }
         catch (Exception ex)
         {
@@ -114,6 +129,49 @@ static int Scan(string[] a)
     return 0;
 }
 
+static LoudnessAnalysis MeasureLoudnessWithProgress(AudioFileReader reader, bool showProgress, string fileName, TimeSpan duration, bool quiet)
+{
+    int channels = reader.WaveFormat.Channels;
+    var meter = new LoudnessMeter(reader.WaveFormat.SampleRate, channels);
+    var peak = new TruePeakMeter(channels);
+
+    var bufferFrames = 4096;
+    var buffer = new float[bufferFrames * channels];
+    int read;
+    long totalBytesRead = 0;
+    long totalBytes = reader.Length;
+
+    while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
+    {
+        var span = buffer.AsSpan(0, read);
+        meter.AddSamples(span);
+        peak.AddSamples(span);
+
+        totalBytesRead += read * sizeof(float);
+
+        if (showProgress && !quiet)
+        {
+            double percent = Math.Min(99, (int)(100.0 * totalBytesRead / totalBytes));
+            Console.Error.Write($"\rProcessing {fileName} ({duration:mm\\:ss}/{duration:mm\\:ss})... {percent}%");
+        }
+    }
+
+    if (showProgress && !quiet)
+    {
+        Console.Error.Write($"\rProcessing {fileName} ({duration:mm\\:ss}/{duration:mm\\:ss})... 100%\n");
+    }
+
+    return new LoudnessAnalysis(
+        meter.IntegratedLufs,
+        meter.LoudnessRange,
+        peak.TruePeakDb,
+        peak.SamplePeakDb,
+        meter.MomentaryLufs,
+        meter.ShortTermLufs,
+        meter.TotalBlockCount,
+        meter.GatedBlockCount);
+}
+
 static int Normalize(string[] a)
 {
     if (a.Length < 2)
@@ -123,7 +181,7 @@ static int Normalize(string[] a)
     }
 
     string input = a[0], output = a[1];
-    
+
     double target;
     if (a.Length > 2)
     {
@@ -141,7 +199,7 @@ static int Normalize(string[] a)
     {
         target = -23.0;
     }
-    
+
     double ceiling = a.Length > 3 ? double.Parse(a[3]) : -1.0;
 
     double gain;
@@ -171,7 +229,7 @@ static void PrintUsage()
 {
     Console.WriteLine("loudness - EBU R128 / BS.1770 metering for NAudio");
     Console.WriteLine();
-    Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json]");
+    Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet]");
     Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1]");
 }
 
