@@ -125,7 +125,7 @@ public class TruePeakMeterJsonExtensionsTests
 
     /// <summary>
     /// Tests that TryFromJson returns true for valid JSON.
-    /// Note: Due to TruePeakMeter's get-only properties, deserialization creates a
+    /// Note: due to TruePeakMeter's get-only properties, deserialization creates a
     /// new instance but the properties won't have the expected values.
     /// </summary>
     [Fact]
