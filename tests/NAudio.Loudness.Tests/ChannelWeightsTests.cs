@@ -5,8 +5,14 @@ using Xunit;
 
 namespace NAudio.Loudness.Tests
 {
+    /// <summary>
+    /// Contains unit tests for the <see cref="ChannelWeights"/> class that verify channel weight calculations.
+    /// </summary>
     public class ChannelWeightsTests
     {
+        /// <summary>
+        /// Tests that <see cref="ChannelWeights.ForChannelCount"/> returns correct weights for mono (1 channel) audio.
+        /// </summary>
         [Fact]
         public void ForChannelCount_Mono_ReturnsCorrectWeights()
         {
@@ -14,6 +20,9 @@ namespace NAudio.Loudness.Tests
             Assert.Equal(new[] { 1.0 }, weights);
         }
 
+        /// <summary>
+        /// Tests that <see cref="ChannelWeights.ForChannelCount"/> returns correct weights for stereo (2 channel) audio.
+        /// </summary>
         [Fact]
         public void ForChannelCount_Stereo_ReturnsCorrectWeights()
         {
@@ -21,6 +30,9 @@ namespace NAudio.Loudness.Tests
             Assert.Equal(new[] { 1.0, 1.0 }, weights);
         }
 
+        /// <summary>
+        /// Tests that <see cref="ChannelWeights.ForChannelCount"/> returns correct weights for 5.1 surround sound (6 channel) audio.
+        /// </summary>
         [Fact]
         public void ForChannelCount_5_1_ReturnsCorrectWeights()
         {
@@ -29,6 +41,9 @@ namespace NAudio.Loudness.Tests
             Assert.Equal(expected, weights);
         }
 
+        /// <summary>
+        /// Tests that <see cref="ChannelWeights.ForChannelCount"/> returns array of ones for unknown channel counts.
+        /// </summary>
         [Fact]
         public void ForChannelCount_UnknownCount_ReturnsAllOnes()
         {
@@ -36,6 +51,9 @@ namespace NAudio.Loudness.Tests
             Assert.Equal(new[] { 1.0, 1.0, 1.0, 1.0 }, weights);
         }
 
+        /// <summary>
+        /// Tests that <see cref="ChannelWeights.ForChannelCount"/> throws <see cref="ArgumentException"/> for invalid channel counts (0 or negative).
+        /// </summary>
         [Fact]
         public void ForChannelCount_InvalidChannelCount_Throws()
         {
@@ -43,6 +61,9 @@ namespace NAudio.Loudness.Tests
             Assert.Throws<ArgumentException>(() => ChannelWeights.ForChannelCount(-1));
         }
 
+        /// <summary>
+        /// Tests that <see cref="LoudnessMeter"/> constructor accepts custom channel weights without throwing exceptions.
+        /// </summary>
         [Fact]
         public void LoudnessMeter_WithCustomWeights_DoesNotThrow()
         {
@@ -51,6 +72,9 @@ namespace NAudio.Loudness.Tests
             Assert.NotNull(meter);
         }
 
+        /// <summary>
+        /// Tests that <see cref="LoudnessMeter"/> constructor throws <see cref="ArgumentException"/> when channel weights array length doesn't match channel count.
+        /// </summary>
         [Fact]
         public void LoudnessMeter_WithMismatchedWeightLength_Throws()
         {
