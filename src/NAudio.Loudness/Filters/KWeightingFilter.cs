@@ -33,7 +33,7 @@ public sealed class KWeightingFilter
         const double g = 3.999843853973347;
         const double q = 0.7071752369554196;
 
-        double k = Math.Tan(Math.PI * f0 / fs);
+        double k = 2.0 * Math.Tan(Math.PI * f0 / fs);
         double vh = Math.Pow(10.0, g / 20.0);
         double vb = Math.Pow(vh, 0.4996667741545416);
         double denom = 1.0 + k / q + k * k;
@@ -53,7 +53,7 @@ public sealed class KWeightingFilter
         const double f0 = 38.13547087602444;
         const double q = 0.5003270373238773;
 
-        double k = Math.Tan(Math.PI * f0 / fs);
+        double k = 2.0 * Math.Tan(Math.PI * f0 / fs);
         double denom = 1.0 + k / q + k * k;
 
         double a1 = 2.0 * (k * k - 1.0) / denom;
