@@ -1,5 +1,3 @@
-namespace NAudio.Loudness;
-
 /// <summary>
 /// True-peak meter per ITU-R BS.1770 Annex 2. Inter-sample peaks are estimated
 /// by 4x oversampling with a polyphase windowed-sinc FIR before taking the
@@ -19,6 +17,11 @@ public sealed class TruePeakMeter
     private double _truePeak;
     private double _samplePeak;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TruePeakMeter"/> class.
+    /// </summary>
+    /// <param name="channels">Number of channels in the input signal. Must be greater than zero.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="channels"/> is less than or equal to zero.</exception>
     public TruePeakMeter(int channels)
     {
         if (channels <= 0) throw new ArgumentOutOfRangeException(nameof(channels));
@@ -31,6 +34,10 @@ public sealed class TruePeakMeter
             _history[c] = new double[TapsPerPhase];
     }
 
+    /// <summary>
+    /// Processes a block of interleaved samples, updating the peak measurements.
+    /// </summary>
+    /// <param name="interleaved">Interleaved samples in the range [-1, 1].</param>
     public void AddSamples(ReadOnlySpan<float> interleaved)
     {
         int frames = interleaved.Length / _channels;
@@ -92,6 +99,9 @@ public sealed class TruePeakMeter
     /// <summary>Linear true-peak magnitude (1.0 == 0 dBTP).</summary>
     public double TruePeakLinear => _truePeak;
 
+    /// <summary>
+    /// Resets the meter to its initial state, clearing all peak history and filter state.
+    /// </summary>
     public void Reset()
     {
         _truePeak = 0.0;

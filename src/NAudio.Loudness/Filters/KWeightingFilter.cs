@@ -20,6 +20,9 @@ public sealed class KWeightingFilter
 
     public double Process(double sample) => _highpass.Process(_shelf.Process(sample));
 
+    /// <summary>
+    /// Resets both filter stages to their initial state.
+    /// </summary>
     public void Reset()
     {
         _shelf.Reset();

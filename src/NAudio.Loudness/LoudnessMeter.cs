@@ -154,6 +154,12 @@ public sealed class LoudnessMeter
     /// </summary>
     public int GatedBlockCount => _gatingBlockEnergy.Count;
 
+    /// <summary>
+    /// Resets the internal state, discarding any previously buffered samples.
+    /// </summary>
+    /// <summary>
+    /// Resets the internal state, discarding any previously buffered samples.
+    /// </summary>
     public void Reset()
     {
         Array.Clear(_sumSquares);
