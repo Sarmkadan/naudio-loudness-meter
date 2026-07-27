@@ -1,0 +1,1 @@
+ChannelWeights keyed only by channel count will mis-weight 5.1 (must skip LFE, which channel index is LFE?) and fail or silently mis-measure 7.1/quad. Define an explicit mapping from WaveFormatExtensible channel mask to weights, exclude LFE, and throw or warn for unknown layouts instead of guessing.
