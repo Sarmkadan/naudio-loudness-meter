@@ -1,1 +1,3 @@
-src/LoudnessAnalysis.cs
+#!/bin/bash
+
+dotnet build
