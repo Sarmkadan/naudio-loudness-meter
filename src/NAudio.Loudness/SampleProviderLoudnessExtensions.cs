@@ -2,7 +2,7 @@ using NAudio.Wave;
 
 namespace NAudio.Loudness;
 
-/// <summary>Convenience helpers for measuring an entire <see cref="ISampleProvider"/>.</summary>
+/// <summary>Convenience helpers for measuring and normalizing <see cref="ISampleProvider"/>.</summary>
 public static class SampleProviderLoudnessExtensions
 {
     /// <summary>
@@ -42,5 +42,39 @@ public static class SampleProviderLoudnessExtensions
             meter.ShortTermLufs,
             meter.TotalBlockCount,
             meter.GatedBlockCount);
+    }
+
+    /// <summary>
+    /// Creates a two-pass normalizer. The provided <paramref name="sourceFactory"/>
+    /// is called twice: once to measure, then again to apply the calculated gain.
+    /// </summary>
+    /// <param name="sourceFactory">A factory to create the source provider (must support rewinding/re-opening).</param>
+    /// <param name="targetLufs">The target integrated loudness in LUFS.</param>
+    /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
+    /// <returns>A normalized <see cref="ISampleProvider"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="sourceFactory"/> is <see langword="null"/>.</exception>
+    public static ISampleProvider NormalizeLoudnessTwoPass(this Func<ISampleProvider> sourceFactory, double targetLufs, double? truePeakCeilingDb = -1.0)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFactory);
+
+        var source = sourceFactory();
+        var analysis = source.MeasureLoudness();
+
+        var source2 = sourceFactory();
+        return new LoudnessNormalizingSampleProvider(source2, analysis.GainToReach(targetLufs), truePeakCeilingDb);
+    }
+
+    /// <summary>
+    /// Creates a one-pass adaptive normalizer.
+    /// </summary>
+    /// <param name="source">The source provider.</param>
+    /// <param name="targetLufs">The target integrated loudness in LUFS.</param>
+    /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
+    /// <returns>A normalized <see cref="ISampleProvider"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    public static ISampleProvider NormalizeLoudnessAdaptive(this ISampleProvider source, double targetLufs, double? truePeakCeilingDb = -1.0)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return new OnePassAdaptiveLoudnessNormalizingSampleProvider(source, targetLufs, truePeakCeilingDb);
     }
 }

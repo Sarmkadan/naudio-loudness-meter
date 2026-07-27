@@ -5,6 +5,9 @@ namespace NAudio.Loudness;
 /// <summary>
 /// Applies a fixed loudness-normalization gain to a source, optionally limiting
 /// the applied gain so the estimated true peak never exceeds a configurable ceiling.
+/// This is a fixed-gain normalizer, suitable for two-pass workflows where the
+/// required gain has been pre-calculated (e.g., using <see cref="LoudnessAnalysis"/>).
+///
 /// When a ceiling is specified, the provider uses predictive gain limiting (loudnorm-style)
 /// to calculate the maximum safe gain before applying it, with hard clipping as a final
 /// fallback to ensure no samples exceed the ceiling.
@@ -20,7 +23,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
 
     /// <param name="source">Audio to normalize.</param>
     /// <param name="gainDb">
-    /// Gain to apply, typically <c>targetLufs - measuredLufs</c>.
+    /// Fixed gain to apply, typically <c>targetLufs - measuredLufs</c>.
     /// If <paramref name="truePeakCeilingDb"/> is specified, this gain will be reduced if necessary to ensure
     /// the true peak does not exceed the ceiling.
     /// </param>
