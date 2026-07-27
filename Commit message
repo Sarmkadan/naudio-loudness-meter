@@ -1,0 +1,3 @@
+eliminate per-block allocations in the metering hot path
+
+use a ring buffer to store the audio data and process it in a streaming fashion
