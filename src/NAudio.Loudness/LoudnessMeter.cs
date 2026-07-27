@@ -227,7 +227,7 @@ public sealed class LoudnessMeter
             return 0.0;
 
         double meanLoudness = shortTerm.Average();
-        double relGate = meanLoudness - 20.0;
+        double relGate = meanLoudness + RelativeGateLu;
         var gated = shortTerm.Where(l => l >= relGate).OrderBy(l => l).ToList();
         if (gated.Count < 2)
             return 0.0;
