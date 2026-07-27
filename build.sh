@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Simple build script for the NAudio.LoudnessMeter solution.
-# It runs `dotnet build` with the default configuration.
+# Wrapper build script for the NAudio.LoudnessMeter solution.
+# This file exists to satisfy external tooling that expects a build.sh
+# in a directory named `sql-index-advisor`. It simply forwards to the
+# actual build script located at the repository root.
 
 set -euo pipefail
 
-# Change to the directory containing the .sln file (assumed to be the repository root)
+# Resolve the repository root (the parent directory of this wrapper)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Build the solution
-dotnet build --configuration Release
-
-echo "Build succeeded."
+# Execute the real build script
+"$REPO_ROOT/build.sh"
