@@ -13,12 +13,23 @@ public static class SampleProviderLoudnessExtensions
     /// <param name="bufferFrames">Buffer size in frames per channel. Must be positive.</param>
     /// <returns>A <see cref="LoudnessAnalysis"/> containing the measured loudness metrics.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="source"/> has an invalid WaveFormat.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="bufferFrames"/> is not positive.</exception>
     public static LoudnessAnalysis MeasureLoudness(this ISampleProvider source, int bufferFrames = 4096)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (source.WaveFormat.Channels == 0)
+        {
+            throw new ArgumentException("Source provider's WaveFormat must have a valid channel count.", nameof(source));
+        }
+        if (source.WaveFormat.SampleRate <= 0)
+        {
+            throw new ArgumentException("Source provider's WaveFormat must have a valid sample rate.", nameof(source));
+        }
         if (bufferFrames <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(bufferFrames), bufferFrames, "Buffer frames must be positive.");
+        }
 
         int channels = source.WaveFormat.Channels;
         var meter = new LoudnessMeter(source.WaveFormat.SampleRate, channels);
@@ -58,16 +69,34 @@ public static class SampleProviderLoudnessExtensions
         ArgumentNullException.ThrowIfNull(sourceFactory);
 
         var source = sourceFactory();
+        if (source.WaveFormat.Channels == 0)
+        {
+            throw new ArgumentException("Source provider's WaveFormat must have a valid channel count.", nameof(sourceFactory));
+        }
+        if (source.WaveFormat.SampleRate <= 0)
+        {
+            throw new ArgumentException("Source provider's WaveFormat must have a valid sample rate.", nameof(sourceFactory));
+        }
+
         var analysis = source.MeasureLoudness();
 
         var source2 = sourceFactory();
+        if (source2.WaveFormat.Channels != source.WaveFormat.Channels)
+        {
+            throw new ArgumentException("Source providers must have the same channel count.", nameof(sourceFactory));
+        }
+        if (source2.WaveFormat.Encoding != source.WaveFormat.Encoding)
+        {
+            throw new ArgumentException("Source providers must have the same encoding.", nameof(sourceFactory));
+        }
+
         return new LoudnessNormalizingSampleProvider(source2, analysis.GainToReach(targetLufs), truePeakCeilingDb);
     }
 
     /// <summary>
     /// Creates a one-pass adaptive normalizer.
     /// </summary>
-    /// <param name="source">The source provider.</param>
+    /// <param name="source">The source provider to normalize.</param>
     /// <param name="targetLufs">The target integrated loudness in LUFS.</param>
     /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
     /// <returns>A normalized <see cref="ISampleProvider"/>.</returns>
@@ -75,6 +104,15 @@ public static class SampleProviderLoudnessExtensions
     public static ISampleProvider NormalizeLoudnessAdaptive(this ISampleProvider source, double targetLufs, double? truePeakCeilingDb = -1.0)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (source.WaveFormat.Channels == 0)
+        {
+            throw new ArgumentException("Source provider's WaveFormat must have a valid channel count.", nameof(source));
+        }
+        if (source.WaveFormat.SampleRate <= 0)
+        {
+            throw new ArgumentException("Source provider's WaveFormat must have a valid sample rate.", nameof(source));
+        }
+
         return new OnePassAdaptiveLoudnessNormalizingSampleProvider(source, targetLufs, truePeakCeilingDb);
     }
 }
