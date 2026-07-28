@@ -14,10 +14,13 @@ public static class LoudnessMeterExtensions
     /// <param name="meter">The loudness meter instance.</param>
     /// <returns>A tuple containing (MomentaryLufs, ShortTermLufs, IntegratedLufs).</returns>
     /// <exception cref="ArgumentNullException"><paramref name="meter"/> is <see langword="null"/>.</exception>
-    public static (double MomentaryLufs, double ShortTermLufs, double IntegratedLufs) GetLufsLevels(
-        this LoudnessMeter meter)
+    /// <exception cref="ArgumentException"><paramref name="meter"/> has an invalid sample rate (must be greater than zero).</exception>
+    public static (double MomentaryLufs, double ShortTermLufs, double IntegratedLufs) GetLufsLevels(this LoudnessMeter meter, bool validateMeter = true)
     {
-        ArgumentNullException.ThrowIfNull(meter);
+        if (validateMeter)
+        {
+            LoudnessMeterValidation.EnsureValid(meter);
+        }
         return (
             meter.MomentaryLufs,
             meter.ShortTermLufs,
