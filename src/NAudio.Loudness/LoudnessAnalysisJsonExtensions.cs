@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,12 +9,16 @@ namespace NAudio.Loudness;
 /// </summary>
 public static class LoudnessAnalysisJsonExtensions
 {
-    private static readonly JsonSerializerOptions _jsonSerializerOptions = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerOptions _jsonSerializerOptions = new(JsonSerializerDefaults.General)
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new DoubleJsonConverter() }
     };
+
+    private static readonly JsonSerializerOptions _indentedJsonOptions = new(_jsonSerializerOptions) { WriteIndented = true };
+    private static readonly JsonSerializerOptions _nonIndentedJsonOptions = new(_jsonSerializerOptions) { WriteIndented = false };
 
     /// <summary>
     /// Serializes a <see cref="LoudnessAnalysis"/> instance to a JSON string.
@@ -26,13 +31,7 @@ public static class LoudnessAnalysisJsonExtensions
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        var options = indented
-            ? new JsonSerializerOptions(_jsonSerializerOptions)
-            {
-                WriteIndented = true
-            }
-            : _jsonSerializerOptions;
-
+        var options = indented ? _indentedJsonOptions : _nonIndentedJsonOptions;
         return JsonSerializer.Serialize(value, options);
     }
 
@@ -40,16 +39,23 @@ public static class LoudnessAnalysisJsonExtensions
     /// Deserializes a JSON string to a <see cref="LoudnessAnalysis"/> instance.
     /// </summary>
     /// <param name="json">The JSON string to deserialize.</param>
-    /// <returns>The deserialized loudness analysis, or null if the JSON is null or empty.</returns>
-    /// <exception cref="JsonException">Thrown when the JSON is invalid or cannot be deserialized.</exception>
+    /// <returns>The deserialized loudness analysis, or null if the JSON is null, empty, or invalid.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="json"/> is null or empty.</exception>
     public static LoudnessAnalysis? FromJson(string json)
     {
         if (string.IsNullOrEmpty(json))
         {
-            return null;
+            throw new ArgumentException("Json string cannot be null or empty.", nameof(json));
         }
 
-        return JsonSerializer.Deserialize<LoudnessAnalysis>(json, _jsonSerializerOptions);
+        try
+        {
+            return JsonSerializer.Deserialize<LoudnessAnalysis>(json, _jsonSerializerOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -60,20 +66,20 @@ public static class LoudnessAnalysisJsonExtensions
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
     public static bool TryFromJson(string json, out LoudnessAnalysis? value)
     {
-        value = null;
-
         if (string.IsNullOrEmpty(json))
         {
+            value = null;
             return false;
         }
 
         try
         {
             value = JsonSerializer.Deserialize<LoudnessAnalysis>(json, _jsonSerializerOptions);
-            return true;
+            return value is not null;
         }
         catch (JsonException)
         {
+            value = null;
             return false;
         }
     }

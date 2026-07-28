@@ -9,12 +9,14 @@ namespace NAudio.Loudness;
 /// </summary>
 public static class LoudnessMeterJsonExtensions
 {
-    private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.General)
+    private static readonly JsonSerializerOptions _commonJsonOptions = new(JsonSerializerDefaults.General)
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
+
+    private static readonly JsonSerializerOptions _indentedJsonOptions = new(_commonJsonOptions) { WriteIndented = true };
+    private static readonly JsonSerializerOptions _nonIndentedJsonOptions = new(_commonJsonOptions) { WriteIndented = false };
 
     /// <summary>
     /// Converts a <see cref="LoudnessMeter"/> to a JSON string.
@@ -27,9 +29,7 @@ public static class LoudnessMeterJsonExtensions
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        var options = indented
-            ? s_jsonOptions
-            : new JsonSerializerOptions(s_jsonOptions) { WriteIndented = false };
+        var options = indented ? _indentedJsonOptions : _nonIndentedJsonOptions;
         return JsonSerializer.Serialize(value, options);
     }
 
@@ -45,7 +45,7 @@ public static class LoudnessMeterJsonExtensions
 
         try
         {
-            return JsonSerializer.Deserialize<LoudnessMeter>(json, s_jsonOptions);
+            return JsonSerializer.Deserialize<LoudnessMeter>(json, _commonJsonOptions);
         }
         catch (JsonException)
         {
@@ -66,7 +66,7 @@ public static class LoudnessMeterJsonExtensions
 
         try
         {
-            value = JsonSerializer.Deserialize<LoudnessMeter>(json, s_jsonOptions);
+            value = JsonSerializer.Deserialize<LoudnessMeter>(json, _commonJsonOptions);
             return value is not null;
         }
         catch (JsonException)
