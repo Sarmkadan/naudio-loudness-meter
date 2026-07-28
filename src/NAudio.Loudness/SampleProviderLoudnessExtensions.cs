@@ -64,7 +64,7 @@ public static class SampleProviderLoudnessExtensions
     /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
     /// <returns>A normalized <see cref="ISampleProvider"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sourceFactory"/> is <see langword="null"/>.</exception>
-    public static ISampleProvider NormalizeLoudnessTwoPass(this Func<ISampleProvider> sourceFactory, double targetLufs, double? truePeakCeilingDb = -1.0)
+    public static ISampleProvider NormalizeLoudnessTwoPass(this Func<ISampleProvider> sourceFactory, double targetLufs, double? truePeakCeilingDb = -1.0, bool validateSource = true)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
 
