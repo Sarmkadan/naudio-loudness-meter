@@ -1,3 +1,4 @@
+using System;
 using NAudio.Wave;
 
 namespace NAudio.Loudness;
@@ -8,7 +9,7 @@ namespace NAudio.Loudness;
 /// This is a fixed-gain normalizer, suitable for two-pass workflows where the
 /// required gain has been pre-calculated (e.g., using <see cref="LoudnessAnalysis"/>).
 ///
-/// When a ceiling is specified, the provider uses predictive gain limiting (loudnorm-style)
+/// When a ceiling is specified, the provider uses predictive gain limiting (loudnorm‑style)
 /// to calculate the maximum safe gain before applying it, with hard clipping as a final
 /// fallback to ensure no samples exceed the ceiling.
 /// </summary>
@@ -28,13 +29,14 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
     /// the true peak does not exceed the ceiling.
     /// </param>
     /// <param name="truePeakCeilingDb">
-    /// If non-null, the applied gain is limited so that the estimated true peak
-    /// never exceeds this level (in dBTP-approximate dBFS terms).
+    /// If non‑null, the applied gain is limited so that the estimated true peak
+    /// never exceeds this level (in dBTP‑approximate dBFS terms).
     /// EBU R128 recommends -1 dBTP. When specified, the requested gain is
     /// reduced if necessary to prevent ceiling violations. This is a predictive
-    /// approach (loudnorm-style) that avoids the inter-sample peak issues of
+    /// approach (loudnorm‑style) that avoids the inter‑sample peak issues of
     /// applying excessive gain. Hard clipping is still applied as a final fallback.
     /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> is <c>null</c>.</exception>
     public LoudnessNormalizingSampleProvider(ISampleProvider source, double gainDb, double? truePeakCeilingDb = -1.0)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -46,14 +48,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
         _truePeakCeilingDb = truePeakCeilingDb ?? -1.0;
 
         // Calculate maximum safe gain to respect the ceiling
-        if (_limit && gainDb > 0)
-        {
-            _maxGainLinear = CalculateMaxSafeGainLinear(gainDb);
-        }
-        else
-        {
-            _maxGainLinear = _gain;
-        }
+        _maxGainLinear = (_limit && gainDb > 0) ? CalculateMaxSafeGainLinear(gainDb) : _gain;
     }
 
     /// <summary>
@@ -67,23 +62,40 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
     public double AppliedGainDb => 20.0 * Math.Log10(_maxGainLinear);
 
     /// <summary>
-    /// Gets the true-peak ceiling in dBTP that is being enforced.
+    /// Gets the true‑peak ceiling in dBTP that is being enforced.
     /// </summary>
     public double TruePeakCeilingDb => _truePeakCeilingDb;
 
+    /// <inheritdoc />
     public WaveFormat WaveFormat => _source.WaveFormat;
 
+    /// <summary>
+    /// Reads audio samples from the source, applies the calculated gain, and
+    /// optionally clips the result to the true‑peak ceiling.
+    /// </summary>
+    /// <param name="buffer">The buffer to write samples into.</param>
+    /// <param name="offset">The offset in <paramref name="buffer"/> at which to start writing.</param>
+    /// <param name="count">The maximum number of samples to read.</param>
+    /// <returns>The number of samples actually read.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="buffer"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="offset"/> or <paramref name="count"/> are negative,
+    /// or when <paramref name="offset"/> + <paramref name="count"/> exceeds <paramref name="buffer"/> length.
+    /// </exception>
     public int Read(float[] buffer, int offset, int count)
     {
+        ArgumentNullException.ThrowIfNull(buffer);
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+        if (offset + count > buffer.Length) throw new ArgumentOutOfRangeException(nameof(count));
+
         int read = _source.Read(buffer, offset, count);
         for (int i = 0; i < read; i++)
         {
-            // Apply predictive-limited gain
+            // Apply predictive‑limited gain
             float v = buffer[offset + i] * _maxGainLinear;
 
             // Apply hard clipping as final safety measure
-            // This ensures no sample ever exceeds the ceiling, even if predictive limiting
-            // was not conservative enough
             if (_limit)
             {
                 if (v > _ceilingLinear) v = _ceilingLinear;
@@ -97,7 +109,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
 
     /// <summary>
     /// Calculates the maximum safe gain (linear) that won't cause true peaks to exceed the ceiling.
-    /// This implements a loudnorm-style predictive limiting approach using conservative safety margins.
+    /// This implements a loudnorm‑style predictive limiting approach using conservative safety margins.
     /// </summary>
     /// <param name="requestedGainDb">The requested gain in dB.</param>
     /// <returns>The maximum safe gain in linear scale.</returns>
@@ -109,27 +121,13 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
             return _gain;
         }
 
-        // Safety margin for inter-sample peaks:
+        // Safety margin for inter‑sample peaks:
         // EBU R128 true peak can exceed sample peak by up to ~1.5 dB for complex signals
-        // ITU-R BS.1770-4 section 5.2 recommends a 1.1 dB margin for true peak measurement
+        // ITU‑R BS.1770‑4 section 5.2 recommends a 1.1 dB margin for true peak measurement
         const double SafetyMarginDb = 1.1;
 
         double ceilingDb = Math.Log10(_ceilingLinear) * 20.0;
         double effectiveCeilingDb = ceilingDb - SafetyMarginDb;
-
-        // Calculate the maximum gain that would keep predicted true peaks below the ceiling
-        // We need: requestedGainDb + samplePeakDb <= effectiveCeilingDb
-        // Since we don't know the actual sample peak here, we use a conservative approach:
-        // Allow the requested gain to be applied, but ensure we never exceed the ceiling
-
-        // For typical EBU R128 use case (ceiling at -1 dBTP):
-        // effectiveCeilingDb = -1.0 - 1.1 = -2.1 dBFS
-        // This ensures we maintain headroom even with inter-sample peaks
-
-        // Calculate the maximum safe gain by ensuring:
-        // maxGainLinear * samplePeak <= ceilingLinear
-        // Since samplePeak <= 1.0 (normalized audio), we can be conservative:
-        // maxGainLinear <= ceilingLinear / samplePeakEstimate
 
         // Use a sample peak estimate of 0.95 (conservative for most audio)
         const double ConservativeSamplePeak = 0.95;
@@ -138,7 +136,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
         // Convert to dB and compare with requested gain
         double maxSafeGainDb = 20.0 * Math.Log10(maxSafeGainLinear);
 
-        // Apply the more restrictive of the two: requested gain or safety-limited gain
+        // Apply the more restrictive of the two: requested gain or safety‑limited gain
         double actualMaxGainDb = Math.Min(requestedGainDb, maxSafeGainDb);
 
         // Ensure we never return a gain larger than requested (when ceiling is high or negative)
