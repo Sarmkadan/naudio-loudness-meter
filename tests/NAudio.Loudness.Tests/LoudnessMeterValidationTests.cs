@@ -1,6 +1,6 @@
+using NAudio.Loudness;
 using System;
 using System.Collections.Generic;
-using NAudio.Loudness;
 using Xunit;
 
 namespace NAudio.Loudness.Tests
@@ -91,6 +91,35 @@ namespace NAudio.Loudness.Tests
             LoudnessMeter? meter = null;
             var ex = Assert.Throws<ArgumentNullException>(() => LoudnessMeterValidation.EnsureValid(meter!));
             Assert.Equal("value", ex.ParamName);
+        }
+
+        [Fact]
+        public void Validate_ReturnsProblem_WhenSampleRateIsNegative()
+        {
+            var meter = CreateMeter(sampleRate: -1);
+            IReadOnlyList<string> problems = meter.Validate();
+
+            Assert.Single(problems);
+            Assert.Contains("SampleRate must be greater than zero", problems[0]);
+        }
+
+        [Fact]
+        public void IsValid_ReturnsFalse_WhenSampleRateIsNegative()
+        {
+            var meter = CreateMeter(sampleRate: -1);
+            bool isValid = meter.IsValid();
+
+            Assert.False(isValid);
+        }
+
+        [Fact]
+        public void EnsureValid_ThrowsArgumentException_WithProblemMessage_WhenSampleRateIsNegative()
+        {
+            var meter = CreateMeter(sampleRate: -1);
+            var ex = Assert.Throws<ArgumentException>(() => meter.EnsureValid());
+
+            Assert.Contains("SampleRate must be greater than zero", ex.Message);
+            Assert.Equal(nameof(meter), ex.ParamName);
         }
     }
 }
