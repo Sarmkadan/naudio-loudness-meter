@@ -1,23 +1,36 @@
 namespace NAudio.Loudness.Filters;
 
 /// <summary>
-/// ITU-R BS.1770 K-weighting: a high-frequency "head" shelving filter followed
-/// by an RLB high-pass. Coefficients are re-derived for the actual sample rate
-/// via the bilinear transform of the 48 kHz analogue prototype, so metering
-/// stays valid at 44.1 kHz, 96 kHz, etc. (the fixed tables in the spec are only
-/// exact at 48 kHz).
+/// Implements the ITU‑R BS.1770 K‑weighting filter, which consists of a high‑shelf
+/// (pre‑filter modelling the acoustic effect of the head) followed by an RLB high‑pass
+/// filter. The coefficients are re‑derived for the actual sample rate via the bilinear
+/// transform of the 48 kHz analogue prototype, ensuring correct metering at common
+/// sample rates such as 44.1 kHz, 48 kHz, 96 kHz, etc.
 /// </summary>
 public sealed class KWeightingFilter
 {
     private readonly Biquad _shelf;
     private readonly Biquad _highpass;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="KWeightingFilter"/> for the specified sample rate.
+    /// </summary>
+    /// <param name="sampleRate">The sample rate, in Hz, for which the filter coefficients will be calculated.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="sampleRate"/> is less than or equal to zero.
+    /// </exception>
     public KWeightingFilter(int sampleRate)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(sampleRate, 0);
         _shelf = BuildShelf(sampleRate);
         _highpass = BuildHighPass(sampleRate);
     }
 
+    /// <summary>
+    /// Processes a single sample through the cascade of the shelf and high‑pass stages.
+    /// </summary>
+    /// <param name="sample">The input sample.</param>
+    /// <returns>The filtered sample.</returns>
     public double Process(double sample) => _highpass.Process(_shelf.Process(sample));
 
     /// <summary>
@@ -29,7 +42,7 @@ public sealed class KWeightingFilter
         _highpass.Reset();
     }
 
-    // Stage 1 - high shelf ("pre-filter" modelling the acoustic effect of the head).
+    // Stage 1 – high shelf ("pre‑filter" modelling the acoustic effect of the head).
     private static Biquad BuildShelf(int fs)
     {
         const double f0 = 1681.974450955533;
@@ -50,7 +63,7 @@ public sealed class KWeightingFilter
         return new Biquad(b0, b1, b2, a1, a2);
     }
 
-    // Stage 2 - RLB high-pass.
+    // Stage 2 – RLB high‑pass.
     private static Biquad BuildHighPass(int fs)
     {
         const double f0 = 38.13547087602444;
@@ -62,7 +75,7 @@ public sealed class KWeightingFilter
         double a1 = 2.0 * (k * k - 1.0) / denom;
         double a2 = (1.0 - k / q + k * k) / denom;
 
-        // Numerator of a pure high-pass is (1, -2, 1), normalised by the same denom.
+        // Numerator of a pure high‑pass is (1, -2, 1), normalised by the same denominator.
         return new Biquad(1.0, -2.0, 1.0, a1, a2);
     }
 }
