@@ -19,6 +19,8 @@ switch (args[0])
         return Scan(args.Skip(1).ToArray());
     case "normalize":
         return Normalize(args.Skip(1).ToArray());
+    case "compare":
+        return Compare(args.Skip(1).ToArray());
     default:
         Console.Error.WriteLine($"Unknown command '{args[0]}'.");
         PrintUsage();
@@ -129,49 +131,6 @@ static int Scan(string[] a)
     return 0;
 }
 
-static LoudnessAnalysis MeasureLoudnessWithProgress(AudioFileReader reader, bool showProgress, string fileName, TimeSpan duration, bool quiet)
-{
-    int channels = reader.WaveFormat.Channels;
-    var meter = new LoudnessMeter(reader.WaveFormat.SampleRate, channels);
-    var peak = new TruePeakMeter(channels);
-
-    var bufferFrames = 4096;
-    var buffer = new float[bufferFrames * channels];
-    int read;
-    long totalBytesRead = 0;
-    long totalBytes = reader.Length;
-
-    while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
-    {
-        var span = buffer.AsSpan(0, read);
-        meter.AddSamples(span);
-        peak.AddSamples(span);
-
-        totalBytesRead += read * sizeof(float);
-
-        if (showProgress && !quiet)
-        {
-            double percent = Math.Min(99, (int)(100.0 * totalBytesRead / totalBytes));
-            Console.Error.Write($"\rProcessing {fileName} ({duration:mm\\:ss}/{duration:mm\\:ss})... {percent}%");
-        }
-    }
-
-    if (showProgress && !quiet)
-    {
-        Console.Error.Write($"\rProcessing {fileName} ({duration:mm\\:ss}/{duration:mm\\:ss})... 100%\n");
-    }
-
-    return new LoudnessAnalysis(
-        meter.IntegratedLufs,
-        meter.LoudnessRange,
-        peak.TruePeakDb,
-        peak.SamplePeakDb,
-        meter.MomentaryLufs,
-        meter.ShortTermLufs,
-        meter.TotalBlockCount,
-        meter.GatedBlockCount);
-}
-
 static int Normalize(string[] a)
 {
     if (a.Length < 2)
@@ -221,6 +180,108 @@ static int Normalize(string[] a)
     return 0;
 }
 
+static int Compare(string[] a)
+{
+    // Expected: compare <fileA.wav> <fileB.wav> [mode]
+    if (a.Length < 2)
+    {
+        Console.Error.WriteLine("usage: loudness compare <fileA.wav> <fileB.wav> [mode]");
+        return 1;
+    }
+
+    string fileA = a[0];
+    string fileB = a[1];
+    // mode argument is currently unused; kept for future extension
+    // string mode = a.Length > 2 ? a[2] : "all";
+
+    if (!File.Exists(fileA))
+    {
+        Console.Error.WriteLine($"File not found: {fileA}");
+        return 1;
+    }
+
+    if (!File.Exists(fileB))
+    {
+        Console.Error.WriteLine($"File not found: {fileB}");
+        return 1;
+    }
+
+    LoudnessAnalysis analysisA;
+    LoudnessAnalysis analysisB;
+
+    try
+    {
+        using var readerA = new AudioFileReader(fileA);
+        analysisA = MeasureLoudnessWithProgress(readerA, false, Path.GetFileName(fileA), readerA.TotalTime, true);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Error processing {fileA}: {ex.Message}");
+        return 1;
+    }
+
+    try
+    {
+        using var readerB = new AudioFileReader(fileB);
+        analysisB = MeasureLoudnessWithProgress(readerB, false, Path.GetFileName(fileB), readerB.TotalTime, true);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Error processing {fileB}: {ex.Message}");
+        return 1;
+    }
+
+    Console.WriteLine("Metric\tFileA\tFileB\tDelta");
+    Console.WriteLine($"Integrated LUFS\t{Fmt(analysisA.IntegratedLufs)}\t{Fmt(analysisB.IntegratedLufs)}\t{Fmt(analysisA.IntegratedLufs - analysisB.IntegratedLufs)}");
+    Console.WriteLine($"True Peak dBTP\t{Fmt(analysisA.TruePeakDb)}\t{Fmt(analysisB.TruePeakDb)}\t{Fmt(analysisA.TruePeakDb - analysisB.TruePeakDb)}");
+    Console.WriteLine($"Momentary Max LUFS\t{Fmt(analysisA.MomentaryMax)}\t{Fmt(analysisB.MomentaryMax)}\t{Fmt(analysisA.MomentaryMax - analysisB.MomentaryMax)}");
+
+    return 0;
+}
+
+static LoudnessAnalysis MeasureLoudnessWithProgress(AudioFileReader reader, bool showProgress, string fileName, TimeSpan duration, bool quiet)
+{
+    int channels = reader.WaveFormat.Channels;
+    var meter = new LoudnessMeter(reader.WaveFormat.SampleRate, channels);
+    var peak = new TruePeakMeter(channels);
+
+    var bufferFrames = 4096;
+    var buffer = new float[bufferFrames * channels];
+    int read;
+    long totalBytesRead = 0;
+    long totalBytes = reader.Length;
+
+    while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
+    {
+        var span = buffer.AsSpan(0, read);
+        meter.AddSamples(span);
+        peak.AddSamples(span);
+
+        totalBytesRead += read * sizeof(float);
+
+        if (showProgress && !quiet)
+        {
+            double percent = Math.Min(99, (int)(100.0 * totalBytesRead / totalBytes));
+            Console.Error.Write($"\rProcessing {fileName} ({duration:mm\\:ss}/{duration:mm\\:ss})... {percent}%");
+        }
+    }
+
+    if (showProgress && !quiet)
+    {
+        Console.Error.Write($"\rProcessing {fileName} ({duration:mm\\:ss}/{duration:mm\\:ss})... 100%\n");
+    }
+
+    return new LoudnessAnalysis(
+        meter.IntegratedLufs,
+        meter.LoudnessRange,
+        peak.TruePeakDb,
+        peak.SamplePeakDb,
+        meter.MomentaryLufs,
+        meter.ShortTermLufs,
+        meter.TotalBlockCount,
+        meter.GatedBlockCount);
+}
+
 static string Fmt(double v) => double.IsNegativeInfinity(v) ? " -inf" : $"{v,7:0.0}";
 
 static string SignedLu(double v) => (v >= 0 ? "+" : "") + v.ToString("0.0");
@@ -231,6 +292,7 @@ static void PrintUsage()
     Console.WriteLine();
     Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet]");
     Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1]");
+    Console.WriteLine(" loudness compare <fileA.wav> <fileB.wav> [mode]");
 }
 
 // Custom JSON converter to handle negative infinity values
