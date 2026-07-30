@@ -31,7 +31,36 @@ public sealed class KWeightingFilter
     /// </summary>
     /// <param name="sample">The input sample.</param>
     /// <returns>The filtered sample.</returns>
-    public double Process(double sample) => _highpass.Process(_shelf.Process(sample));
+    public double Process(double sample)
+    {
+        // Use locals to avoid repeated field access for each sample.
+        var shelf = _shelf;
+        var highpass = _highpass;
+        return highpass.Process(shelf.Process(sample));
+    }
+
+    /// <summary>
+    /// Processes an array of samples through the filter. The filter state is kept in the
+    /// underlying <see cref="Biquad"/> instances, but the references to those instances are
+    /// stored in locals for the duration of the loop to minimise field‑access overhead.
+    /// </summary>
+    /// <param name="samples">The input samples.</param>
+    /// <returns>An array containing the filtered samples.</returns>
+    public double[] ProcessSamples(double[] samples)
+    {
+        if (samples is null) throw new ArgumentNullException(nameof(samples));
+
+        var shelf = _shelf;
+        var highpass = _highpass;
+        var output = new double[samples.Length];
+
+        for (int i = 0; i < samples.Length; i++)
+        {
+            output[i] = highpass.Process(shelf.Process(samples[i]));
+        }
+
+        return output;
+    }
 
     /// <summary>
     /// Resets both filter stages to their initial state.
