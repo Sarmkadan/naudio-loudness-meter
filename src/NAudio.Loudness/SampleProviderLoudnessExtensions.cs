@@ -1,4 +1,6 @@
+using System;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace NAudio.Loudness;
 
@@ -53,6 +55,19 @@ public static class SampleProviderLoudnessExtensions
             meter.ShortTermLufs,
             meter.TotalBlockCount,
             meter.GatedBlockCount);
+    }
+
+    /// <summary>
+    /// Returns only the integrated loudness (LUFS) of the source. This is a thin wrapper
+    /// around <see cref="MeasureLoudness"/> that extracts the <c>IntegratedLufs</c> value.
+    /// </summary>
+    /// <param name="source">The sample provider to measure.</param>
+    /// <param name="bufferFrames">Buffer size in frames per channel. Must be positive.</param>
+    /// <returns>The integrated loudness in LUFS.</returns>
+    public static double GetIntegratedLoudness(this ISampleProvider source, int bufferFrames = 4096)
+    {
+        // Re‑use the full measurement logic and just return the integrated value.
+        return source.MeasureLoudness(bufferFrames).IntegratedLufs;
     }
 
     /// <summary>
@@ -114,5 +129,21 @@ public static class SampleProviderLoudnessExtensions
         }
 
         return new OnePassAdaptiveLoudnessNormalizingSampleProvider(source, targetLufs, truePeakCeilingDb);
+    }
+
+    /// <summary>
+    /// Applies a constant gain (in dB) to the source provider.
+    /// </summary>
+    /// <param name="source">The source provider to which the gain will be applied.</param>
+    /// <param name="gainDb">Gain in decibels. Positive values increase level, negative values attenuate.</param>
+    /// <returns>A new <see cref="ISampleProvider"/> that outputs the source samples with the specified gain applied.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    public static ISampleProvider WithGainDb(this ISampleProvider source, double gainDb)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        // Convert dB gain to linear amplitude factor.
+        double linearGain = Math.Pow(10.0, gainDb / 20.0);
+        var volumeProvider = new VolumeSampleProvider(source) { Volume = (float)linearGain };
+        return volumeProvider;
     }
 }
