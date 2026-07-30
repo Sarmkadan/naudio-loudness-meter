@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using System.Linq;
 
-if (args.Length == 0 || args[0] is "-h" or "--help")
+if (args.Length == 0 || args[0] == "-h" || args[0] == "--help")
 {
     PrintUsage();
     return 0;
