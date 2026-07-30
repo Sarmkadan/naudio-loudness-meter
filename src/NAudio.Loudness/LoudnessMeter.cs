@@ -1,4 +1,5 @@
 using NAudio.Loudness.Filters;
+using System.Buffers;
 
 namespace NAudio.Loudness;
 
@@ -85,23 +86,30 @@ public sealed class LoudnessMeter
 
     private void CompleteSubBlock()
     {
-        var means = new double[_channels];
-        for (int c = 0; c < _channels; c++)
+        var means = ArrayPool<double>.Shared.Rent(_channels);
+        try
         {
-            means[c] = _sumSquares[c] / _subBlockSize;
-            _sumSquares[c] = 0.0;
-        }
-        _subBlockSampleCount = 0;
-        _subBlocks.Add(means);
+            for (int c = 0; c < _channels; c++)
+            {
+                means[c] = _sumSquares[c] / _subBlockSize;
+                _sumSquares[c] = 0.0;
+            }
+            _subBlockSampleCount = 0;
+            _subBlocks.Add(means);
 
-        // A completed sub-block closes one 400 ms gating block (75 % overlap
-        // means a new gating block every 100 ms).
-        if (_subBlocks.Count >= MomentaryBlocks)
+            // A completed sub-block closes one 400 ms gating block (75 % overlap
+            // means a new gating block every 100 ms).
+            if (_subBlocks.Count >= MomentaryBlocks)
+            {
+                var energy = AverageEnergy(_subBlocks.Count - MomentaryBlocks, MomentaryBlocks);
+                _totalBlockCount++;
+                if (LoudnessFromEnergy(energy) >= AbsoluteGateLufs)
+                    _gatingBlockEnergy.Add(energy);
+            }
+        }
+        finally
         {
-            var energy = AverageEnergy(_subBlocks.Count - MomentaryBlocks, MomentaryBlocks);
-            _totalBlockCount++;
-            if (LoudnessFromEnergy(energy) >= AbsoluteGateLufs)
-                _gatingBlockEnergy.Add(energy);
+            ArrayPool<double>.Shared.Return(means);
         }
     }
 
@@ -164,7 +172,15 @@ public sealed class LoudnessMeter
     {
         Array.Clear(_sumSquares);
         _subBlockSampleCount = 0;
+        foreach (var block in _subBlocks)
+        {
+            ArrayPool<double>.Shared.Return(block);
+        }
         _subBlocks.Clear();
+        foreach (var block in _gatingBlockEnergy)
+        {
+            ArrayPool<double>.Shared.Return(block);
+        }
         _gatingBlockEnergy.Clear();
         _totalBlockCount = 0;
         foreach (var f in _filters) f.Reset();
@@ -181,27 +197,41 @@ public sealed class LoudnessMeter
     // Per-channel mean-square averaged across `count` consecutive sub-blocks.
     private double[] AverageEnergy(int start, int count)
     {
-        var acc = new double[_channels];
-        for (int i = 0; i < count; i++)
+        var acc = ArrayPool<double>.Shared.Rent(_channels);
+        try
         {
-            var block = _subBlocks[start + i];
+            for (int i = 0; i < count; i++)
+            {
+                var block = _subBlocks[start + i];
+                for (int c = 0; c < _channels; c++)
+                    acc[c] += block[c];
+            }
             for (int c = 0; c < _channels; c++)
-                acc[c] += block[c];
+                acc[c] /= count;
+            return acc;
         }
-        for (int c = 0; c < _channels; c++)
-            acc[c] /= count;
-        return acc;
+        finally
+        {
+            ArrayPool<double>.Shared.Return(acc);
+        }
     }
 
     private double[] MeanEnergy(List<double[]> blocks)
     {
-        var acc = new double[_channels];
-        foreach (var b in blocks)
+        var acc = ArrayPool<double>.Shared.Rent(_channels);
+        try
+        {
+            foreach (var b in blocks)
+                for (int c = 0; c < _channels; c++)
+                    acc[c] += b[c];
             for (int c = 0; c < _channels; c++)
-                acc[c] += b[c];
-        for (int c = 0; c < _channels; c++)
-            acc[c] /= blocks.Count;
-        return acc;
+                acc[c] /= blocks.Count;
+            return acc;
+        }
+        finally
+        {
+            ArrayPool<double>.Shared.Return(acc);
+        }
     }
 
     private double LoudnessFromEnergy(double[] channelEnergy)
