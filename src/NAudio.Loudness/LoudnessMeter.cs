@@ -16,11 +16,12 @@ namespace NAudio.Loudness;
 /// </remarks>
 public sealed class LoudnessMeter
 {
-    private const double SubBlockSeconds = 0.1;
-    private const int MomentaryBlocks = 4;   // 400 ms
-    private const int ShortTermBlocks = 30;  // 3 s
-    private const double AbsoluteGateLufs = -70.0;
-    private const double RelativeGateLu = -10.0;
+    // Magic numbers moved to LoudnessConstants
+    private const double SubBlockSeconds = LoudnessConstants.SubBlockSeconds;
+    private const int MomentaryBlocks = LoudnessConstants.MomentaryBlocks;   // 400 ms
+    private const int ShortTermBlocks = LoudnessConstants.ShortTermBlocks;  // 3 s
+    private const double AbsoluteGateLufs = LoudnessConstants.AbsoluteGateLufs;
+    private const double RelativeGateLu = LoudnessConstants.RelativeGateLu;
     private const double Offset = -0.691;    // BS.1770 loudness offset
 
     private readonly int _channels;

@@ -15,17 +15,17 @@ namespace NAudio.Loudness;
 public static class LoudnessRangeCalculator
 {
     // Absolute gate threshold in LUFS (values below are discarded)
-    private const double AbsoluteGateThreshold = -70.0;
+    private const double AbsoluteGateThreshold = LoudnessConstants.LraAbsoluteGateThreshold;
 
     // Relative gate offset in LU (values more than 20 LU below the gated maximum are discarded)
-    private const double RelativeGateOffset = -20.0;
+    private const double RelativeGateOffset = LoudnessConstants.LraRelativeGateOffset;
 
     /// <summary>
     /// Computes the loudness range (LRA) from a collection of short‑term loudness values.
     /// </summary>
     /// <param name="shortTermLoudnessValues">
     /// A sequence of short‑term loudness measurements (in LUFS). Typically these are the
-    /// short‑term values produced by <see cref="LoudnessMeter"/> during analysis.
+    /// short-term values produced by <see cref="LoudnessMeter"/> during analysis.
     /// </param>
     /// <returns>The loudness range in LU (95 th percentile – 10 th percentile) after gating.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="shortTermLoudnessValues"/> is <c>null</c>.</exception>
