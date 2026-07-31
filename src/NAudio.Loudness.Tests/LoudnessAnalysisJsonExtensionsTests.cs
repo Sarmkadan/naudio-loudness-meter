@@ -17,6 +17,11 @@ namespace NAudio.Loudness.Tests
             TotalBlockCount: 123,
             GatedBlockCount: 45);
 
+        /// <summary>
+        /// Gets or sets the loudness analysis JSON extensions.
+        /// </summary>
+        public LoudnessAnalysisJsonExtensions JsonExtension { get; set; }
+
         [Fact]
         public void ToJson_WithValidValue_ReturnsCamelCaseJson()
         {
