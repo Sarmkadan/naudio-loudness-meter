@@ -295,12 +295,27 @@ static void PrintUsage()
     Console.WriteLine(" loudness compare <fileA.wav> <fileB.wav> [mode]");
 }
 
-// Custom JSON converter to handle negative infinity values
+/// <summary>
+/// Custom JSON converter for handling double values that may be negative infinity, serializing them as the string "-inf".
+/// </summary>
 public class JsonLoudnessConverter : JsonConverter<double>
 {
+    /// <summary>
+    /// Reads a double value from the JSON.
+    /// </summary>
+    /// <param name="reader">The UTF-8 JSON reader.</param>
+    /// <param name="typeToConvert">The type to convert (should be double).</param>
+    /// <param name="options">The JSON serializer options.</param>
+    /// <returns>The double value read from the JSON.</returns>
     public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         => reader.GetDouble();
 
+    /// <summary>
+    /// Writes a double value to the JSON. If the value is negative infinity, writes the string "-inf"; otherwise, writes the number.
+    /// </summary>
+    /// <param name="writer">The UTF-8 JSON writer.</param>
+    /// <param name="value">The double value to write.</param>
+    /// <param name="options">The JSON serializer options.</param>
     public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
     {
         if (double.IsNegativeInfinity(value))
