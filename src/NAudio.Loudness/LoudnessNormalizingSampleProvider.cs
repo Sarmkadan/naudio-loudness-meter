@@ -21,6 +21,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
     private readonly bool _limit;
     private readonly float _maxGainLinear;
     private readonly double _truePeakCeilingDb;
+    private long _clippedSampleCount;
 
     /// <param name="source">Audio to normalize.</param>
     /// <param name="gainDb">
@@ -66,6 +67,14 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
     /// </summary>
     public double TruePeakCeilingDb => _truePeakCeilingDb;
 
+    /// <summary>
+    /// Gets the number of samples that have been hard-clamped because the applied
+    /// gain would otherwise have pushed them past the full-scale (or configured ceiling)
+    /// limit. A non-zero value indicates the predictive gain limiting did not fully
+    /// prevent overshoot for this material and audible clipping may have occurred.
+    /// </summary>
+    public long ClippedSampleCount => _clippedSampleCount;
+
     /// <inheritdoc />
     public WaveFormat WaveFormat => _source.WaveFormat;
 
@@ -95,11 +104,19 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
             // Apply predictive‑limited gain
             float v = buffer[offset + i] * _maxGainLinear;
 
-            // Apply hard clipping as final safety measure
-            if (_limit)
+            // Hard clamp as a final safety measure: when a ceiling is configured, use it;
+            // otherwise always fall back to full scale ([-1, 1]) so a positive gain can
+            // never push samples beyond what the sample format can represent.
+            float clampLimit = _limit ? _ceilingLinear : 1.0f;
+            if (v > clampLimit)
             {
-                if (v > _ceilingLinear) v = _ceilingLinear;
-                else if (v < -_ceilingLinear) v = -_ceilingLinear;
+                v = clampLimit;
+                _clippedSampleCount++;
+            }
+            else if (v < -clampLimit)
+            {
+                v = -clampLimit;
+                _clippedSampleCount++;
             }
 
             buffer[offset + i] = v;
