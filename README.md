@@ -349,6 +349,32 @@ meter.Reset();
 Console.WriteLine(meter.IntegratedLufs);   // double.NegativeInfinity again
 ```
 
+## BiquadTests
+
+`BiquadTests` exercises the direct-form I `Biquad` filter section in isolation, independent
+of the loudness/gating pipeline built on top of it. It covers DC and steady-state behaviour
+(low-pass passing DC, a high-pass attenuating it), boundedness on sine waves and arbitrary
+bounded inputs, `Reset()` clearing internal state, and coefficient edge cases such as an
+identity filter (`b0 = 1`, rest zero) or a simple scaling filter (`b0 = 0.5`, rest zero).
+
+```csharp
+using NAudio.Loudness.Filters;
+
+// Simple scaling filter: y[n] = 0.5 * x[n]
+var filter = new Biquad(b0: 0.5, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0);
+
+double output = filter.Process(1.0);   // 0.5
+output = filter.Process(-0.5);         // -0.25
+
+// A filter with feedback (b1 != 0) maintains state across calls
+var stateful = new Biquad(b0: 0.5, b1: 0.5, b2: 0.0, a1: 0.0, a2: 0.0);
+double o1 = stateful.Process(1.0);
+double o2 = stateful.Process(0.5);     // differs from o1 due to accumulated state
+
+// Reset clears the internal delay lines
+stateful.Reset();
+```
+
 ## License
 
 MIT
