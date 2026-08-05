@@ -316,6 +316,39 @@ Console.WriteLine(meter.IsSilent());        // False
 Console.WriteLine(meter.GetLoudnessRange()); // >= 0.0
 ```
 
+## LoudnessMeterGatingTests
+
+`LoudnessMeterGatingTests` verifies `LoudnessMeter`'s implementation of the
+EBU R128 / BS.1770 gating rules: the absolute gate at -70 LUFS and the
+relative gate at -10 LU below the mean of ungated blocks. It checks that
+signals below the absolute gate never contribute to `IntegratedLufs` or
+`GatedBlockCount`, that quiet passages following loud ones are suppressed by
+the relative gate while still counting toward `TotalBlockCount`, and that
+`Reset()` returns the meter to its initial, silent state.
+
+```csharp
+using NAudio.Loudness;
+
+var meter = new LoudnessMeter(sampleRate: 48000, channels: 1);
+
+// Loud section clears both gates and drives the integrated value.
+double loudAmp = Math.Pow(10.0, -20.0 / 20.0);
+meter.AddSamples(SignalGenerator.Sine(1000, loudAmp, 48000, seconds: 3, channels: 1));
+
+// Quiet section clears the absolute gate but falls below the relative
+// gate (mean - 10 LU), so it is excluded from IntegratedLufs even though
+// it still increments GatedBlockCount and TotalBlockCount.
+double quietAmp = Math.Pow(10.0, -40.0 / 20.0);
+meter.AddSamples(SignalGenerator.Sine(1000, quietAmp, 48000, seconds: 3, channels: 1));
+
+Console.WriteLine(meter.IntegratedLufs);   // stays close to -20 LUFS
+Console.WriteLine(meter.TotalBlockCount);  // counts all blocks, loud and quiet
+Console.WriteLine(meter.GatedBlockCount);  // counts blocks past the absolute gate
+
+meter.Reset();
+Console.WriteLine(meter.IntegratedLufs);   // double.NegativeInfinity again
+```
+
 ## License
 
 MIT
