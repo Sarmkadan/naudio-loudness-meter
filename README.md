@@ -283,6 +283,39 @@ halving amplitude shifts loudness by exactly 6.02 LU, an inter-sample tone
 proves true peak exceeds sample peak, and a measure -> normalize -> re-measure
 round trip lands on the requested LUFS target.
 
+## LoudnessMeterExtensionsTests
+
+`LoudnessMeterExtensionsTests` exercises the convenience extension methods
+built on top of `LoudnessMeter` - pulling a snapshot of momentary/short-term
+LUFS, formatting a human-readable status line, checking silence, and reading
+back the loudness range. It confirms the extensions handle both a freshly
+created meter (still silent, no finite range yet) and a meter that has been
+fed real signal via `SignalGenerator` or a raw sample buffer, and that a
+`null` meter throws rather than producing garbage values.
+
+```csharp
+using NAudio.Loudness;
+
+var meter = new LoudnessMeter(sampleRate: 48000, channels: 1);
+
+// A quiet meter reports silent and stays that way until enough
+// signal clears the absolute gate (-70 LUFS).
+Console.WriteLine(meter.IsSilent()); // True
+
+var samples = SignalGenerator.Sine(frequency: 1000, amplitude: 0.5,
+    sampleRate: 48000, seconds: 5, channels: 1);
+meter.AddSamples(samples);
+
+var levels = meter.GetLufsLevels();
+Console.WriteLine($"{levels.MomentaryLufs:0.00} / {levels.ShortTermLufs:0.00} LUFS");
+
+Console.WriteLine(meter.GetCurrentLufsStatus("0.00"));
+// e.g. "Momentary: -6.02 LUFS | Short-term: -6.02 LUFS | Integrated: -6.02 LUFS"
+
+Console.WriteLine(meter.IsSilent());        // False
+Console.WriteLine(meter.GetLoudnessRange()); // >= 0.0
+```
+
 ## License
 
 MIT
