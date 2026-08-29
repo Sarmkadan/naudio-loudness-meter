@@ -5,8 +5,29 @@
 /// </summary>
 public sealed class TruePeakMeter
 {
-    private const int Oversample = 4;
+    // Four-times oversampling follows the true-peak measurement model in BS.1770 Annex 2.
+    private const int OversampleFactor = 4;
+
+    // Polyphase FIR length used to approximate the BS.1770 Annex 2 interpolation filter.
     private const int TapsPerPhase = 12;
+
+    // Normalized cutoff frequency for the interpolation filter (1/oversample) as per BS.1770 Annex 2.
+    private const double FilterCutoffRatio = 1.0 / OversampleFactor;
+
+    // Divisor for calculating the center of the FIR filter (length-1)/2.0.
+    private const double FilterCenterDivisor = 2.0;
+
+    // Scale factor for the Hann window (0.5) used in the interpolation filter.
+    private const double HannWindowScale = 0.5;
+
+    // Frequency factor for the Hann window (2.0) used in the interpolation filter.
+    private const double HannAngularFrequencyFactor = 2.0;
+
+    // Gain at zero frequency for the sinc function (1.0).
+    private const double UnityGain = 1.0;
+
+    // Factor for converting linear amplitude to decibels (20.0 * log10).
+    private const double DbPerDecadeFactor = 20.0;
 
     private readonly int _channels;
     private readonly double[][] _phases;      // [phase][tap]
@@ -62,7 +83,7 @@ public sealed class TruePeakMeter
         _pos[channel] = (pos + 1) % TapsPerPhase;
 
         // Convolve each polyphase branch against the delay line.
-        for (int p = 0; p < Oversample; p++)
+        for (int p = 0; p < OversampleFactor; p++)
         {
             var coeffs = _phases[p];
             double acc = 0.0;
@@ -112,37 +133,38 @@ public sealed class TruePeakMeter
     }
 
     private static double LinearToDb(double v) =>
-        v <= 0.0 ? double.NegativeInfinity : 20.0 * Math.Log10(v);
+        v <= 0.0 ? double.NegativeInfinity : DbPerDecadeFactor * Math.Log10(v);
 
-    // Windowed-sinc low-pass split into `Oversample` polyphase branches.
+    // Windowed-sinc low-pass split into `OversampleFactor` polyphase branches.
     private static double[][] BuildPolyphase()
     {
-        int length = Oversample * TapsPerPhase;
+        int length = OversampleFactor * TapsPerPhase;
         var proto = new double[length];
-        double center = (length - 1) / 2.0;
+        double center = (length - 1) / FilterCenterDivisor;
         double sum = 0.0;
 
         for (int n = 0; n < length; n++)
         {
-            double x = (n - center) / Oversample;
-            double sinc = x == 0.0 ? 1.0 : Math.Sin(Math.PI * x) / (Math.PI * x);
+            double x = (n - center) * FilterCutoffRatio;
+            double sinc = x == 0.0 ? UnityGain : Math.Sin(Math.PI * x) / (Math.PI * x);
             // Hann window.
-            double w = 0.5 - 0.5 * Math.Cos(2.0 * Math.PI * n / (length - 1));
+            double w = HannWindowScale - HannWindowScale *
+                Math.Cos(HannAngularFrequencyFactor * Math.PI * n / (length - 1));
             proto[n] = sinc * w;
             sum += proto[n];
         }
 
         // Normalise so the summed branches have unity DC gain (per branch = 1).
-        double perBranch = sum / Oversample;
+        double perBranch = sum / OversampleFactor;
         for (int n = 0; n < length; n++)
             proto[n] /= perBranch;
 
-        var phases = new double[Oversample][];
-        for (int p = 0; p < Oversample; p++)
+        var phases = new double[OversampleFactor][];
+        for (int p = 0; p < OversampleFactor; p++)
         {
             var branch = new double[TapsPerPhase];
             for (int t = 0; t < TapsPerPhase; t++)
-                branch[t] = proto[p + t * Oversample];
+                branch[t] = proto[p + t * OversampleFactor];
             phases[p] = branch;
         }
         return phases;
