@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 if (args.Length == 0 || args[0] == "-h" || args[0] == "--help")
@@ -29,9 +30,13 @@ switch (args[0])
 
 static int Scan(string[] a)
 {
-    if (a.Length < 1)
+    var commandTimer = Stopwatch.StartNew();
+    bool verbose = a.Contains("--verbose");
+    var inputs = a.Where(arg => arg != "--json" && arg != "--quiet" && arg != "--verbose").ToArray();
+
+    if (inputs.Length < 1)
     {
-        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet]");
+        Console.Error.WriteLine("usage: loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet] [--verbose]");
         return 1;
     }
 
@@ -39,7 +44,7 @@ static int Scan(string[] a)
     bool quiet = a.Contains("--quiet");
 
     var files = new List<string>();
-    foreach (var arg in a)
+    foreach (var arg in inputs)
     {
         if (Directory.Exists(arg))
         {
@@ -49,17 +54,24 @@ static int Scan(string[] a)
         {
             files.Add(arg);
         }
+        else
+        {
+            Log(verbose, "scan", $"file={LogValue(arg)} status=skipped reason=not-found");
+        }
     }
 
     if (files.Count == 0)
     {
         Console.Error.WriteLine("No files found.");
+        Log(verbose, "scan", $"fileCount=0 totalElapsedMs={commandTimer.ElapsedMilliseconds}");
         return 1;
     }
 
     var results = new List<LoudnessAnalysis>();
     foreach (var file in files)
     {
+        var fileTimer = Stopwatch.StartNew();
+        Log(verbose, "scan", $"file={LogValue(file)} status=start");
         try
         {
             using var reader = new AudioFileReader(file);
@@ -79,6 +91,8 @@ static int Scan(string[] a)
             {
                 Console.Error.Write($"\rProcessing {Path.GetFileName(file)} ({duration:mm\\:ss}/{duration:mm\\:ss})... 100%\n");
             }
+
+            Log(verbose, "scan", $"file={LogValue(file)} status=complete durationMs={fileTimer.ElapsedMilliseconds}");
         }
         catch (Exception ex)
         {
@@ -128,23 +142,36 @@ static int Scan(string[] a)
         }
         Console.WriteLine($"Summary\t{Fmt(sumIntegratedLufs / count)}\t{sumLoudnessRange / count,7:0.0}\t{Fmt(sumTruePeakDb / count)}");
     }
+    Log(verbose, "scan", $"fileCount={files.Count} totalElapsedMs={commandTimer.ElapsedMilliseconds}");
     return 0;
 }
 
 static int Normalize(string[] a)
 {
-    if (a.Length < 2)
+    var commandTimer = Stopwatch.StartNew();
+    bool verbose = a.Contains("--verbose");
+    var positional = a.Where(arg => arg != "--verbose").ToArray();
+
+    if (positional.Length < 2)
     {
-        Console.Error.WriteLine("usage: loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1]");
+        Console.Error.WriteLine("usage: loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1] [--verbose]");
         return 1;
     }
 
-    string input = a[0], output = a[1];
+    string input = positional[0], output = positional[1];
+
+    if (!File.Exists(input))
+    {
+        Log(verbose, "normalize", $"file={LogValue(input)} status=skipped reason=not-found");
+        Log(verbose, "normalize", $"fileCount=0 totalElapsedMs={commandTimer.ElapsedMilliseconds}");
+        Console.Error.WriteLine($"File not found: {input}");
+        return 1;
+    }
 
     double target;
-    if (a.Length > 2)
+    if (positional.Length > 2)
     {
-        string t = a[2].ToLower();
+        string t = positional[2].ToLower();
         if (t == "spotify" || t == "youtube") target = -14.0;
         else if (t == "ebu") target = -23.0;
         else if (t == "podcast") target = -16.0;
@@ -159,8 +186,10 @@ static int Normalize(string[] a)
         target = -23.0;
     }
 
-    double ceiling = a.Length > 3 ? double.Parse(a[3]) : -1.0;
+    double ceiling = positional.Length > 3 ? double.Parse(positional[3]) : -1.0;
 
+    var fileTimer = Stopwatch.StartNew();
+    Log(verbose, "normalize", $"file={LogValue(input)} status=start");
     double gain;
     using (var probe = new AudioFileReader(input))
     {
@@ -177,31 +206,41 @@ static int Normalize(string[] a)
     }
 
     Console.WriteLine($"Wrote {output}");
+    Log(verbose, "normalize", $"file={LogValue(input)} status=complete durationMs={fileTimer.ElapsedMilliseconds}");
+    Log(verbose, "normalize", $"fileCount=1 totalElapsedMs={commandTimer.ElapsedMilliseconds}");
     return 0;
 }
 
 static int Compare(string[] a)
 {
+    var commandTimer = Stopwatch.StartNew();
+    bool verbose = a.Contains("--verbose");
+    var positional = a.Where(arg => arg != "--verbose").ToArray();
+
     // Expected: compare <fileA.wav> <fileB.wav> [mode]
-    if (a.Length < 2)
+    if (positional.Length < 2)
     {
-        Console.Error.WriteLine("usage: loudness compare <fileA.wav> <fileB.wav> [mode]");
+        Console.Error.WriteLine("usage: loudness compare <fileA.wav> <fileB.wav> [mode] [--verbose]");
         return 1;
     }
 
-    string fileA = a[0];
-    string fileB = a[1];
+    string fileA = positional[0];
+    string fileB = positional[1];
     // mode argument is currently unused; kept for future extension
     // string mode = a.Length > 2 ? a[2] : "all";
 
     if (!File.Exists(fileA))
     {
+        Log(verbose, "compare", $"file={LogValue(fileA)} status=skipped reason=not-found");
+        Log(verbose, "compare", $"fileCount=0 totalElapsedMs={commandTimer.ElapsedMilliseconds}");
         Console.Error.WriteLine($"File not found: {fileA}");
         return 1;
     }
 
     if (!File.Exists(fileB))
     {
+        Log(verbose, "compare", $"file={LogValue(fileB)} status=skipped reason=not-found");
+        Log(verbose, "compare", $"fileCount=0 totalElapsedMs={commandTimer.ElapsedMilliseconds}");
         Console.Error.WriteLine($"File not found: {fileB}");
         return 1;
     }
@@ -209,10 +248,13 @@ static int Compare(string[] a)
     LoudnessAnalysis analysisA;
     LoudnessAnalysis analysisB;
 
+    var fileTimer = Stopwatch.StartNew();
+    Log(verbose, "compare", $"file={LogValue(fileA)} status=start");
     try
     {
         using var readerA = new AudioFileReader(fileA);
         analysisA = MeasureLoudnessWithProgress(readerA, false, Path.GetFileName(fileA), readerA.TotalTime, true);
+        Log(verbose, "compare", $"file={LogValue(fileA)} status=complete durationMs={fileTimer.ElapsedMilliseconds}");
     }
     catch (Exception ex)
     {
@@ -220,10 +262,13 @@ static int Compare(string[] a)
         return 1;
     }
 
+    fileTimer.Restart();
+    Log(verbose, "compare", $"file={LogValue(fileB)} status=start");
     try
     {
         using var readerB = new AudioFileReader(fileB);
         analysisB = MeasureLoudnessWithProgress(readerB, false, Path.GetFileName(fileB), readerB.TotalTime, true);
+        Log(verbose, "compare", $"file={LogValue(fileB)} status=complete durationMs={fileTimer.ElapsedMilliseconds}");
     }
     catch (Exception ex)
     {
@@ -236,6 +281,7 @@ static int Compare(string[] a)
     Console.WriteLine($"True Peak dBTP\t{Fmt(analysisA.TruePeakDb)}\t{Fmt(analysisB.TruePeakDb)}\t{Fmt(analysisA.TruePeakDb - analysisB.TruePeakDb)}");
     Console.WriteLine($"Momentary Max LUFS\t{Fmt(analysisA.MomentaryMax)}\t{Fmt(analysisB.MomentaryMax)}\t{Fmt(analysisA.MomentaryMax - analysisB.MomentaryMax)}");
 
+    Log(verbose, "compare", $"fileCount=2 totalElapsedMs={commandTimer.ElapsedMilliseconds}");
     return 0;
 }
 
@@ -286,13 +332,23 @@ static string Fmt(double v) => double.IsNegativeInfinity(v) ? " -inf" : $"{v,7:0
 
 static string SignedLu(double v) => (v >= 0 ? "+" : "") + v.ToString("0.0");
 
+static void Log(bool verbose, string stage, string message)
+{
+    if (verbose)
+        Console.Error.WriteLine($"[{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}] {stage} {message}");
+}
+
+static string LogValue(string value) => value.Any(char.IsWhiteSpace)
+    ? $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\""
+    : value;
+
 static void PrintUsage()
 {
     Console.WriteLine("loudness - EBU R128 / BS.1770 metering for NAudio");
     Console.WriteLine();
-    Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet]");
-    Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1]");
-    Console.WriteLine(" loudness compare <fileA.wav> <fileB.wav> [mode]");
+    Console.WriteLine(" loudness scan <input.wav> [input2.wav ...] or <directory> [--json] [--quiet] [--verbose]");
+    Console.WriteLine(" loudness normalize <input.wav> <output.wav> [targetLufs=-23|spotify|ebu|youtube|podcast] [ceilingDbtp=-1] [--verbose]");
+    Console.WriteLine(" loudness compare <fileA.wav> <fileB.wav> [mode] [--verbose]");
 }
 
 /// <summary>
