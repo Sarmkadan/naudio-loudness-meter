@@ -43,17 +43,40 @@ public sealed class LoudnessMeter
     // Total count of 400ms blocks that entered the gating computation
     private int _totalBlockCount = 0;
 
+    /// <summary>Initializes a loudness meter using the default weights for the channel count.</summary>
+    /// <param name="sampleRate">The sample rate in Hz.</param>
+    /// <param name="channels">The number of interleaved audio channels.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="sampleRate"/> or <paramref name="channels"/> is not positive.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// No default channel weights are available for <paramref name="channels"/>.
+    /// </exception>
     public LoudnessMeter(int sampleRate, int channels)
         : this(sampleRate, channels, ChannelWeights.ForChannelCount(channels))
     {
     }
 
+    /// <summary>Initializes a loudness meter using the specified channel weights.</summary>
+    /// <param name="sampleRate">The sample rate in Hz.</param>
+    /// <param name="channels">The number of interleaved audio channels.</param>
+    /// <param name="channelWeights">The loudness weight for each channel.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="sampleRate"/> or <paramref name="channels"/> is not positive.
+    /// </exception>
+    /// <exception cref="ArgumentNullException"><paramref name="channelWeights"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="channelWeights"/> does not contain one finite, non-negative weight per channel.
+    /// </exception>
     public LoudnessMeter(int sampleRate, int channels, double[] channelWeights)
     {
         if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
         if (channels <= 0) throw new ArgumentOutOfRangeException(nameof(channels));
+        ArgumentNullException.ThrowIfNull(channelWeights);
         if (channelWeights.Length != channels)
             throw new ArgumentException("Weight vector length must match channel count.", nameof(channelWeights));
+        if (channelWeights.Any(weight => !double.IsFinite(weight) || weight < 0.0))
+            throw new ArgumentException("Channel weights must be finite and non-negative.", nameof(channelWeights));
 
         SampleRate = sampleRate;
         _channels = channels;
@@ -68,8 +91,15 @@ public sealed class LoudnessMeter
     public int SampleRate { get; }
 
     /// <summary>Feeds a block of interleaved samples in the range [-1, 1].</summary>
+    /// <param name="interleaved">The samples, ordered by frame and then by channel.</param>
+    /// <exception cref="ArgumentException">
+    /// The sample count is not a multiple of the channel count.
+    /// </exception>
     public void AddSamples(ReadOnlySpan<float> interleaved)
     {
+        if (interleaved.Length % _channels != 0)
+            throw new ArgumentException("Sample count must be a multiple of channel count.", nameof(interleaved));
+
         int frames = interleaved.Length / _channels;
         for (int f = 0; f < frames; f++)
         {
