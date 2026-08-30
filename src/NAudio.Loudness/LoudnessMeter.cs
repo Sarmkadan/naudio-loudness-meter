@@ -1,6 +1,4 @@
 using NAudio.Loudness.Filters;
-using System.Buffers;
-
 namespace NAudio.Loudness;
 
 /// <summary>
@@ -33,8 +31,13 @@ public sealed class LoudnessMeter
     private readonly double[] _sumSquares;
     private int _subBlockSampleCount;
 
-    // Per-channel mean-square of every completed sub-block.
-    private readonly List<double[]> _subBlocks = new();
+    // Per-channel mean-square of the most recent completed sub-blocks.
+    private readonly double[] _subBlocks;
+    private int _subBlockStart;
+    private int _completedSubBlockCount;
+
+    // Short-term loudness history is retained for whole-program LRA.
+    private readonly List<double> _shortTermLoudness = new();
 
     // Channel-weighted energy of every completed 400 ms gating block that
     // passed the absolute gate, together with its loudness.
@@ -86,6 +89,7 @@ public sealed class LoudnessMeter
         for (int c = 0; c < channels; c++)
             _filters[c] = new KWeightingFilter(sampleRate);
         _sumSquares = new double[channels];
+        _subBlocks = new double[ShortTermBlocks * channels];
     }
 
     public int SampleRate { get; }
@@ -117,31 +121,38 @@ public sealed class LoudnessMeter
 
     private void CompleteSubBlock()
     {
-        var means = ArrayPool<double>.Shared.Rent(_channels);
-        try
+        int destinationBlock;
+        if (_completedSubBlockCount < ShortTermBlocks)
         {
-            for (int c = 0; c < _channels; c++)
-            {
-                means[c] = _sumSquares[c] / _subBlockSize;
-                _sumSquares[c] = 0.0;
-            }
-            _subBlockSampleCount = 0;
-            _subBlocks.Add(means);
+            destinationBlock = (_subBlockStart + _completedSubBlockCount) % ShortTermBlocks;
+            _completedSubBlockCount++;
+        }
+        else
+        {
+            destinationBlock = _subBlockStart;
+            _subBlockStart = (_subBlockStart + 1) % ShortTermBlocks;
+        }
 
-            // A completed sub-block closes one 400 ms gating block (75 % overlap
-            // means a new gating block every 100 ms).
-            if (_subBlocks.Count >= MomentaryBlocks)
-            {
-                var energy = AverageEnergy(_subBlocks.Count - MomentaryBlocks, MomentaryBlocks);
-                _totalBlockCount++;
-                if (LoudnessFromEnergy(energy) >= AbsoluteGateLufs)
-                    _gatingBlockEnergy.Add(energy);
-            }
-        }
-        finally
+        int destination = destinationBlock * _channels;
+        for (int c = 0; c < _channels; c++)
         {
-            ArrayPool<double>.Shared.Return(means);
+            _subBlocks[destination + c] = _sumSquares[c] / _subBlockSize;
+            _sumSquares[c] = 0.0;
         }
+        _subBlockSampleCount = 0;
+
+        // A completed sub-block closes one 400 ms gating block (75 % overlap
+        // means a new gating block every 100 ms).
+        if (_completedSubBlockCount >= MomentaryBlocks)
+        {
+            var energy = AverageEnergy(_completedSubBlockCount - MomentaryBlocks, MomentaryBlocks);
+            _totalBlockCount++;
+            if (LoudnessFromEnergy(energy) >= AbsoluteGateLufs)
+                _gatingBlockEnergy.Add(energy);
+        }
+
+        if (_completedSubBlockCount == ShortTermBlocks)
+            _shortTermLoudness.Add(LoudnessFromEnergy(AverageEnergy(0, ShortTermBlocks)));
     }
 
     /// <summary>Loudness of the most recent 400 ms, or -inf if not enough audio yet.</summary>
@@ -202,16 +213,11 @@ public sealed class LoudnessMeter
     public void Reset()
     {
         Array.Clear(_sumSquares);
+        Array.Clear(_subBlocks);
         _subBlockSampleCount = 0;
-        foreach (var block in _subBlocks)
-        {
-            ArrayPool<double>.Shared.Return(block);
-        }
-        _subBlocks.Clear();
-        foreach (var block in _gatingBlockEnergy)
-        {
-            ArrayPool<double>.Shared.Return(block);
-        }
+        _subBlockStart = 0;
+        _completedSubBlockCount = 0;
+        _shortTermLoudness.Clear();
         _gatingBlockEnergy.Clear();
         _totalBlockCount = 0;
         foreach (var f in _filters) f.Reset();
@@ -219,50 +225,37 @@ public sealed class LoudnessMeter
 
     private double WindowLoudness(int blocks)
     {
-        if (_subBlocks.Count < blocks)
+        if (_completedSubBlockCount < blocks)
             return double.NegativeInfinity;
-        var energy = AverageEnergy(_subBlocks.Count - blocks, blocks);
+        var energy = AverageEnergy(_completedSubBlockCount - blocks, blocks);
         return LoudnessFromEnergy(energy);
     }
 
     // Per-channel mean-square averaged across `count` consecutive sub-blocks.
     private double[] AverageEnergy(int start, int count)
     {
-        var acc = ArrayPool<double>.Shared.Rent(_channels);
-        try
+        var acc = new double[_channels];
+        for (int i = 0; i < count; i++)
         {
-            for (int i = 0; i < count; i++)
-            {
-                var block = _subBlocks[start + i];
-                for (int c = 0; c < _channels; c++)
-                    acc[c] += block[c];
-            }
+            int block = (_subBlockStart + start + i) % ShortTermBlocks;
+            int source = block * _channels;
             for (int c = 0; c < _channels; c++)
-                acc[c] /= count;
-            return acc;
+                acc[c] += _subBlocks[source + c];
         }
-        finally
-        {
-            ArrayPool<double>.Shared.Return(acc);
-        }
+        for (int c = 0; c < _channels; c++)
+            acc[c] /= count;
+        return acc;
     }
 
     private double[] MeanEnergy(List<double[]> blocks)
     {
-        var acc = ArrayPool<double>.Shared.Rent(_channels);
-        try
-        {
-            foreach (var b in blocks)
-                for (int c = 0; c < _channels; c++)
-                    acc[c] += b[c];
+        var acc = new double[_channels];
+        foreach (var b in blocks)
             for (int c = 0; c < _channels; c++)
-                acc[c] /= blocks.Count;
-            return acc;
-        }
-        finally
-        {
-            ArrayPool<double>.Shared.Return(acc);
-        }
+                acc[c] += b[c];
+        for (int c = 0; c < _channels; c++)
+            acc[c] /= blocks.Count;
+        return acc;
     }
 
     private double LoudnessFromEnergy(double[] channelEnergy)
@@ -279,16 +272,10 @@ public sealed class LoudnessMeter
     // an absolute (-70 LUFS) then relative (-20 LU) gate.
     private double ComputeLoudnessRange()
     {
-        if (_subBlocks.Count < ShortTermBlocks)
+        if (_shortTermLoudness.Count == 0)
             return 0.0;
 
-        var shortTerm = new List<double>();
-        for (int end = ShortTermBlocks; end <= _subBlocks.Count; end++)
-        {
-            double l = LoudnessFromEnergy(AverageEnergy(end - ShortTermBlocks, ShortTermBlocks));
-            if (l >= AbsoluteGateLufs)
-                shortTerm.Add(l);
-        }
+        var shortTerm = _shortTermLoudness.Where(l => l >= AbsoluteGateLufs).ToList();
 
         if (shortTerm.Count == 0)
             return 0.0;
