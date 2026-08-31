@@ -6,16 +6,24 @@ namespace NAudio.Loudness;
 /// Applies adaptive loudness normalization in a single pass.
 /// 
 /// Note: This is an adaptive implementation that updates gain dynamically based on measured 
-/// loudness. It may introduce gain fluctuations during the stream. It converges to the 
+/// loudness. Audio passes through at unity gain until an integrated measurement is available,
+/// after which gain changes are smoothed to reduce audible fluctuations. It converges to the
 /// target loudness over time.
 /// </summary>
 public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISampleProvider
 {
+    private const double MinimumMeasurementSeconds = 0.4;
+    private const double GainSmoothingTimeSeconds = 1.0;
+
     private readonly ISampleProvider _source;
     private readonly double _targetLufs;
     private readonly float _ceilingLinear;
     private readonly LoudnessMeter _meter;
     private readonly bool _limit;
+    private readonly long _minimumMeasurementSamples;
+    private readonly float _gainSmoothingCoefficient;
+    private float _currentGainLinear = 1.0f;
+    private long _samplesProcessed;
 
     /// <summary>
     /// Initializes a new instance of <see cref="OnePassAdaptiveLoudnessNormalizingSampleProvider"/>.
@@ -31,6 +39,10 @@ public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISamplePr
         _limit = truePeakCeilingDb.HasValue;
         _ceilingLinear = _limit ? (float)Math.Pow(10.0, truePeakCeilingDb!.Value / 20.0) : 1.0f;
         _meter = new LoudnessMeter(source.WaveFormat.SampleRate, source.WaveFormat.Channels);
+        _minimumMeasurementSamples = (long)Math.Ceiling(
+            source.WaveFormat.SampleRate * source.WaveFormat.Channels * MinimumMeasurementSeconds);
+        _gainSmoothingCoefficient = (float)(1.0 - Math.Exp(
+            -1.0 / (source.WaveFormat.SampleRate * source.WaveFormat.Channels * GainSmoothingTimeSeconds)));
     }
 
     /// <inheritdoc/>
@@ -44,17 +56,24 @@ public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISamplePr
         
         var span = buffer.AsSpan(offset, read);
         _meter.AddSamples(span);
-        
-        // Simple adaptive logic: adjust gain based on current integrated loudness
-        // Note: IntegratedLufs depends on all samples seen so far, so it converges over time.
-        // This is a basic implementation.
+
+        // IntegratedLufs depends on all samples seen so far, so the target gain converges over time.
+        // Keep the initial 400 ms at unity because no complete gating block exists before then.
         double currentLufs = _meter.IntegratedLufs;
-        double gainDb = _targetLufs - currentLufs;
-        float gainLinear = (float)Math.Pow(10.0, gainDb / 20.0);
-        
+        bool measurementAvailable = double.IsFinite(currentLufs)
+            && _samplesProcessed + read >= _minimumMeasurementSamples;
+        float targetGainLinear = measurementAvailable
+            ? (float)Math.Pow(10.0, (_targetLufs - currentLufs) / 20.0)
+            : 1.0f;
+
         for (int i = 0; i < read; i++)
         {
-            buffer[offset + i] *= gainLinear;
+            if (measurementAvailable && _samplesProcessed + i >= _minimumMeasurementSamples)
+            {
+                _currentGainLinear += (targetGainLinear - _currentGainLinear) * _gainSmoothingCoefficient;
+            }
+
+            buffer[offset + i] *= _currentGainLinear;
             
             // Hard clipping as final safety measure
             if (_limit)
@@ -63,7 +82,8 @@ public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISamplePr
                 else if (buffer[offset + i] < -_ceilingLinear) buffer[offset + i] = -_ceilingLinear;
             }
         }
-        
+
+        _samplesProcessed += read;
         return read;
     }
 }
