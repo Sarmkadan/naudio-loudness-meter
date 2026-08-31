@@ -121,15 +121,16 @@ public sealed class TruePeakMeter
     public double TruePeakLinear => _truePeak;
 
     /// <summary>
-    /// Resets the meter to its initial state, clearing all peak history and filter state.
+    /// Resets all peak measurements and filter history so the meter can be reused.
     /// </summary>
     public void Reset()
     {
         _truePeak = 0.0;
         _samplePeak = 0.0;
-        Array.Clear(_pos);
         Array.Clear(_channelTruePeaks);
-        foreach (var h in _history) Array.Clear(h);
+        foreach (var history in _history)
+            Array.Clear(history);
+        Array.Clear(_pos);
     }
 
     private static double LinearToDb(double v) =>
