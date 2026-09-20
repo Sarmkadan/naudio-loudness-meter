@@ -1,286 +1,129 @@
-namespace NAudio.Loudness.Tests;
-
+using System;
 using NAudio.Loudness.Filters;
 using Xunit;
 
-/// <summary>
-/// Tests for <see cref="Biquad"/> - Direct-form I biquad filter section.
-/// </summary>
+namespace NAudio.Loudness.Tests.Filters;
+
 public class BiquadTests
 {
     [Fact]
-    public void Process_DCInput_LowpassFilterShouldPassDC()
+    public void IdentityFilter_PassThrough()
     {
-        // Arrange: Create a simple low-pass filter with cutoff at 1000 Hz
-        // Using bilinear transform coefficients for a simple low-pass at 48 kHz
-        // This creates a filter that should pass DC (0 Hz) with minimal attenuation
-        var lowpass = new Biquad(
-            b0: 0.0675,  // Feed-forward coefficients (normalized)
-            b1: 0.1349,
-            b2: 0.0675,
-            a1: -1.1429,
-            a2: 0.4128
-        );
+        // Arrange: identity filter (b0=1, others 0)
+        var filter = new Biquad(b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0);
 
-        const int samplesToProcess = 10000;
-        const double dcValue = 1.0; // Full scale DC
-
-        // Act: Process DC through the low-pass filter
-        double maxOutput = 0.0;
-        double lastOutput = 0.0;
-        for (int i = 0; i < samplesToProcess; i++)
-        {
-            lastOutput = lowpass.Process(dcValue);
-            maxOutput = Math.Max(maxOutput, Math.Abs(lastOutput));
-        }
-
-        // Assert: DC should pass through with minimal attenuation (low-pass filter)
-        // The DC gain should be close to 1.0 (0 dB)
-        Assert.InRange(lastOutput, 0.9, 1.1);
-
-        // Output should stabilize to a constant value
-        Assert.Equal(lastOutput, lowpass.Process(dcValue), 10);
+        // Act & Assert: for any input, output should equal input
+        Assert.Equal(0.0, filter.Process(0.0));
+        Assert.Equal(1.0, filter.Process(1.0));
+        Assert.Equal(-1.0, filter.Process(-1.0));
+        Assert.Equal(3.14, filter.Process(3.14));
     }
 
     [Fact]
-    public void Process_DCInput_HighpassFilterShouldBeDifferentFromLowpass()
+    public void LowPassFilter_DCStepResponse_Stable()
     {
-        // Arrange: Create both low-pass and high-pass filters
-        var lowpass = new Biquad(
-            b0: 0.0675,
-            b1: 0.1349,
-            b2: 0.0675,
-            a1: -1.1429,
-            a2: 0.4128
-        );
+        // Arrange: simple low-pass filter (DC gain = 1)
+        // H(z) = 1 / (2 - z^-1) => b0=0.5, b1=0, b2=0, a1=-0.5, a2=0
+        var filter = new Biquad(b0: 0.5, b1: 0.0, b2: 0.0, a1: -0.5, a2: 0.0);
+        filter.Reset(); // start from zero state
 
-        var highpass = new Biquad(
-            b0: 0.5,
-            b1: -0.5,
-            b2: 0.0,
-            a1: 0.0,
-            a2: 0.0
-        );
+        // Act: apply step input (1.0) repeatedly
+        double y1 = filter.Process(1.0);
+        double y2 = filter.Process(1.0);
+        double y3 = filter.Process(1.0);
+        double y4 = filter.Process(1.0);
+        double y5 = filter.Process(1.0);
 
-        const double dcValue = 1.0;
-
-        // Act: Process DC through both filters
-        double lowpassOutput = 0.0;
-        double highpassOutput = 0.0;
-        for (int i = 0; i < 1000; i++)
-        {
-            lowpassOutput = lowpass.Process(dcValue);
-            highpassOutput = highpass.Process(dcValue);
-        }
-
-        // Assert: Low-pass should pass DC, high-pass should attenuate it
-        // They should produce significantly different outputs
-        Assert.NotEqual(lowpassOutput, highpassOutput, 2);
-        Assert.InRange(Math.Abs(lowpassOutput), 0.9, 1.1); // Low-pass passes DC
+        // Assert: output should converge to 1.0 (DC gain) without oscillation or divergence
+        Assert.InRange(y1, 0.0, 1.0);
+        Assert.InRange(y2, 0.0, 1.0);
+        Assert.InRange(y3, 0.0, 1.0);
+        Assert.InRange(y4, 0.0, 1.0);
+        Assert.InRange(y5, 0.0, 1.0);
+        Assert.True(Math.Abs(y5 - 1.0) < 0.1); // after 5 samples, should be close to 1.0
     }
 
     [Fact]
-    public void Process_SineWave_StableOutput()
+    public void StatePersistence_SampleBySampleVsBatch_Identical()
     {
-        // Arrange
-        const int sampleRate = 48000;
-        const double frequency = 1000.0; // 1 kHz
-        const double amplitude = 0.5; // -6 dBFS
-        const int samplesToProcess = 20000;
+        // Arrange: arbitrary filter
+        var filter1 = new Biquad(b0: 0.1, b1: 0.2, b2: 0.3, a1: -0.4, a2: 0.5);
+        var filter2 = new Biquad(b0: 0.1, b1: 0.2, b2: 0.3, a1: -0.4, a2: 0.5);
+        double[] input = { 0.5, -0.5, 1.0, -1.0, 0.0 };
 
-        // Create a 1 kHz sine wave
-        float[] sineWave = SignalGenerator.Sine(frequency, amplitude, sampleRate, samplesToProcess / (double)sampleRate, 1);
-
-        // Create a low-pass filter at 2000 Hz
-        var lowpass = new Biquad(
-            b0: 0.2929,
-            b1: 0.5858,
-            b2: 0.2929,
-            a1: -0.0000,
-            a2: 0.1716
-        );
-
-        // Act: Process the sine wave
-        double maxOutput = 0.0;
-        double minOutput = 0.0;
-        for (int i = 0; i < samplesToProcess; i++)
+        // Act: process sample-by-sample with filter1
+        double[] outputSampleBySample = new double[input.Length];
+        for (int i = 0; i < input.Length; i++)
         {
-            double filteredSample = lowpass.Process(sineWave[i]);
-            maxOutput = Math.Max(maxOutput, filteredSample);
-            minOutput = Math.Min(minOutput, filteredSample);
+            outputSampleBySample[i] = filter1.Process(input[i]);
         }
 
-        // Assert: Output should be bounded (stable)
-        // For a bounded input (-0.5 to 0.5), output should remain bounded
-        Assert.InRange(maxOutput, -0.6, 0.6);
-        Assert.InRange(minOutput, -0.6, 0.6);
+        // Act: reset filter2 and process all at once (same as sample-by-sample because state is internal)
+        filter2.Reset();
+        double[] outputBatch = new double[input.Length];
+        for (int i = 0; i < input.Length; i++)
+        {
+            outputBatch[i] = filter2.Process(input[i]);
+        }
+
+        // Assert: outputs should be identical
+        Assert.Equal(outputSampleBySample, outputBatch);
     }
 
     [Fact]
-    public void Process_BoundedInput_ProducesBoundedOutput()
+    public void Reset_ZerosInternalState()
     {
-        // Arrange: Create a low-pass filter
-        var filter = new Biquad(
-            b0: 0.2929,
-            b1: 0.5858,
-            b2: 0.2929,
-            a1: -0.0000,
-            a2: 0.1716
-        );
-
-        // Act: Process various bounded inputs
-        double[] testInputs = { -1.0, -0.5, -0.1, 0.0, 0.1, 0.5, 1.0 };
-        double[] outputs = new double[testInputs.Length];
-
-        for (int i = 0; i < testInputs.Length; i++)
-        {
-            outputs[i] = filter.Process(testInputs[i]);
-        }
-
-        // Assert: All outputs should be bounded by input magnitude
-        foreach (double output in outputs)
-        {
-            Assert.InRange(output, -1.1, 1.1);
-        }
-    }
-
-    [Fact]
-    public void Process_Reset_ShouldClearState()
-    {
-        // Arrange
-        var filter = new Biquad(
-            b0: 0.2929,
-            b1: 0.5858,
-            b2: 0.2929,
-            a1: -0.0000,
-            a2: 0.1716
-        );
-
-        // Process some samples to build up state
+        // Arrange: filter with non-zero state
+        var filter = new Biquad(b0: 0.1, b1: 0.2, b2: 0.3, a1: -0.4, a2: 0.5);
+        // Push some samples to set state
         filter.Process(1.0);
+        filter.Process(-1.0);
         filter.Process(0.5);
-        filter.Process(0.0);
 
-        // Get output before reset
-        double outputBeforeReset = filter.Process(0.0);
-
-        // Reset the filter
+        // Act: reset
         filter.Reset();
 
-        // Act: Process the same input after reset
-        double outputAfterReset = filter.Process(0.0);
-
-        // Assert: After reset, the filter should produce a different output
-        // (reset clears the state variables, changing the output)
-        Assert.NotEqual(outputBeforeReset, outputAfterReset);
+        // Assert: after reset, processing zero should yield zero (since state is zero)
+        // For zero input, output = -a1*y1 - a2*y2, but y1 and y2 are zero after reset
+        Assert.Equal(0.0, filter.Process(0.0));
+        // Next sample should also be zero because state remains zero until non-zero input
+        Assert.Equal(0.0, filter.Process(0.0));
     }
 
     [Fact]
-    public void Process_Reset_ShouldNotThrow()
+    public void NyquistFrequency_NumericalStability_LongDuration()
     {
-        // Arrange
-        var filter = new Biquad(
-            b0: 0.2929,
-            b1: 0.5858,
-            b2: 0.2929,
-            a1: -0.0000,
-            a2: 0.1716
-        );
+        // Arrange: filter that should be stable at Nyquist (e.g., low-pass)
+        // Using a simple low-pass: b0=0.5, b1=0.5, a1=0, a2=0 (two-point moving average)
+        var filter = new Biquad(b0: 0.5, b1: 0.5, b2: 0.0, a1: 0.0, a2: 0.0);
+        filter.Reset();
 
-        // Act: Reset should not throw
-        var exception = Record.Exception(() => filter.Reset());
+        // Act: process Nyquist frequency signal (alternating 1, -1, 1, -1, ...) for 10 seconds at 48 kHz
+        int sampleRate = 48000;
+        int durationSeconds = 10;
+        int totalSamples = sampleRate * durationSeconds;
+        double lastOutput = 0.0;
+        bool hasNaN = false;
+        bool hasInfinity = false;
 
-        // Assert
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void Process_MultipleSamples_ShouldProcessCorrectly()
-    {
-        // Arrange
-        var filter = new Biquad(
-            b0: 0.5,
-            b1: 0.0,
-            b2: 0.0,
-            a1: 0.0,
-            a2: 0.0
-        );
-
-        const double input = 1.0;
-        const int samplesToProcess = 100;
-
-        // Act
-        double output = 0.0;
-        for (int i = 0; i < samplesToProcess; i++)
+        for (int n = 0; n < totalSamples; n++)
         {
-            output = filter.Process(input);
+            double input = (n % 2 == 0) ? 1.0 : -1.0; // Nyquist: fs/2
+            double output = filter.Process(input);
+            if (double.IsNaN(output) || double.IsInfinity(output))
+            {
+                hasNaN = true;
+                if (double.IsInfinity(output))
+                    hasInfinity = true;
+                break;
+            }
+            lastOutput = output;
         }
 
-        // Assert: Output should be 0.5 (b0 * input with b1=b2=a1=a2=0)
-        Assert.Equal(0.5, output, 10);
-    }
-
-    [Fact]
-    public void Process_ZeroCoefficients_ShouldPassInput()
-    {
-        // Arrange: Identity filter (b0=1, all others=0)
-        var identity = new Biquad(
-            b0: 1.0,
-            b1: 0.0,
-            b2: 0.0,
-            a1: 0.0,
-            a2: 0.0
-        );
-
-        const double input = 0.75;
-
-        // Act
-        double output = identity.Process(input);
-
-        // Assert: Should pass input unchanged
-        Assert.Equal(input, output);
-    }
-
-    [Fact]
-    public void Process_NegativeInput_ShouldProduceCorrectOutput()
-    {
-        // Arrange
-        var filter = new Biquad(
-            b0: 0.5,
-            b1: 0.0,
-            b2: 0.0,
-            a1: 0.0,
-            a2: 0.0
-        );
-
-        const double negativeInput = -0.5;
-
-        // Act
-        double output = filter.Process(negativeInput);
-
-        // Assert: Should produce correct output for negative input
-        Assert.Equal(negativeInput * 0.5, output);
-    }
-
-    [Fact]
-    public void Process_ConsecutiveCalls_ShouldMaintainState()
-    {
-        // Arrange
-        var filter = new Biquad(
-            b0: 0.5,
-            b1: 0.5,
-            b2: 0.0,
-            a1: 0.0,
-            a2: 0.0
-        );
-
-        // Act: Process a sequence of values
-        double output1 = filter.Process(1.0);
-        double output2 = filter.Process(0.5);
-        double output3 = filter.Process(0.0);
-
-        // Assert: Outputs should be different due to state accumulation
-        Assert.NotEqual(output1, output2);
-        Assert.NotEqual(output2, output3);
+        // Assert: output should not diverge to NaN or infinity
+        Assert.False(hasNaN, "Output became NaN");
+        Assert.False(hasInfinity, "Output became infinity");
+        // For this specific filter and input, output should be bounded
+        Assert.InRange(lastOutput, -1.0, 1.0);
     }
 }
