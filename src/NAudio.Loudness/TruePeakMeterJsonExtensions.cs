@@ -13,7 +13,8 @@ public static class TruePeakMeterJsonExtensions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+        Converters = { new DoubleJsonConverter() }
     };
 
     /// <summary>
@@ -24,7 +25,10 @@ public static class TruePeakMeterJsonExtensions
     /// <returns>A JSON string representation of the true-peak meter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
     public static string ToJson(this TruePeakMeter value, bool indented = false)
-        => JsonSerializer.Serialize(value, indented ? CreateIndentedOptions() : _jsonSerializerOptions);
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return JsonSerializer.Serialize(value, indented ? CreateIndentedOptions() : _jsonSerializerOptions);
+    }
 
     /// <summary>
     /// Deserializes a JSON string to a <see cref="TruePeakMeter"/> instance.
@@ -58,11 +62,55 @@ public static class TruePeakMeterJsonExtensions
 
         try
         {
+            // Pre-validate: the JSON must be an object containing at least one
+            // expected property (truePeakDb, samplePeakDb, channelPeaksDbtp, truePeakLinear).
+            // Without this check, any valid JSON object deserializes to a default
+            // TruePeakMeter because all public properties are read-only.
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return false;
+
+            bool hasValidProperty = false;
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                var name = prop.Name;
+                if (name.Equals("truePeakDb", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("samplePeakDb", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("truePeakLinear", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Value must be numeric (or a recognized special string like "NaN"/"-Infinity")
+                    if (prop.Value.ValueKind == JsonValueKind.Number)
+                    {
+                        hasValidProperty = true;
+                        break;
+                    }
+                    if (prop.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var s = prop.Value.GetString();
+                        if (s == "NaN" || s == "Infinity" || s == "-Infinity")
+                        {
+                            hasValidProperty = true;
+                            break;
+                        }
+                    }
+                }
+                else if (name.Equals("channelPeaksDbtp", StringComparison.OrdinalIgnoreCase) &&
+                         prop.Value.ValueKind == JsonValueKind.Array)
+                {
+                    hasValidProperty = true;
+                    break;
+                }
+            }
+
+            if (!hasValidProperty)
+                return false;
+
             value = JsonSerializer.Deserialize<TruePeakMeter>(json, _jsonSerializerOptions);
-            return true;
+            return value is not null;
         }
-        catch (JsonException)
+        catch (Exception)
         {
+            value = null;
             return false;
         }
     }

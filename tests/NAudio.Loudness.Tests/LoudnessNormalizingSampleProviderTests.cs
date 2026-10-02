@@ -95,7 +95,8 @@ public class LoudnessNormalizingSampleProviderTests
         // After gain limiting, the provider should clip to the ceiling (0.5)
         foreach (var sample in buffer)
         {
-            Assert.InRange(sample, -0.5f, 0.5f);
+            float ceiling = (float)Math.Pow(10.0, -6.0 / 20.0); // -6 dBTP ≈ 0.5012
+            Assert.InRange(sample, -ceiling, ceiling);
         }
     }
 

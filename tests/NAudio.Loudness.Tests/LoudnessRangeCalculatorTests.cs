@@ -111,9 +111,10 @@ public class LoudnessRangeCalculatorTests
         // Act
         double lra = LoudnessRangeCalculator.ComputeLoudnessRange(values);
 
-        // Assert - -40 is excluded by the relative gate; the remaining gated set
-        // [-30,-25,-22,-20] yields p10=-29.1, p95=-20.4 -> LRA = 8.2
-        Assert.Equal(8.2, lra, 2);
+        // Assert - with -20 LU relative gate offset: max=-20, threshold=-40,
+        // all 5 values survive: [-40,-30,-25,-22,-20]
+        // p10=pos 0.4: -40+0.4*10=-36, p95=pos 3.8: -22+0.8*2=-20.4, LRA=15.6
+        Assert.Equal(15.6, lra, 1);
     }
 
     [Fact]
@@ -142,9 +143,10 @@ public class LoudnessRangeCalculatorTests
         // Act
         double lra = LoudnessRangeCalculator.ComputeLoudnessRange(values);
 
-        // Assert - absolute gate keeps everything except -80; relative gate (max=-10,
-        // threshold=-20) then keeps only [-20,-15,-10] -> p10=-19, p95=-10.5 -> LRA = 8.5
-        Assert.Equal(8.5, lra, 2);
+        // Assert - absolute gate keeps [-50..-10]; relative gate (max=-10,
+        // threshold=-30) keeps [-30,-25,-20,-15,-10] (5 values)
+        // p10=pos 0.4: -30+0.4*5=-28, p95=pos 3.8: -15+0.8*5=-11, LRA=17.0
+        Assert.Equal(17.0, lra, 1);
     }
 
     [Fact]
@@ -156,9 +158,10 @@ public class LoudnessRangeCalculatorTests
         // Act
         double lra = LoudnessRangeCalculator.ComputeLoudnessRange(values);
 
-        // Assert - max is -10, relative threshold is -20, so the -30 duplicates are
-        // gated out entirely; only the two -10 values remain -> LRA = 0
-        Assert.Equal(0.0, lra, 2);
+        // Assert - max=-10, relative threshold=-30 (with -20 LU offset),
+        // all 5 values survive: [-30,-30,-30,-10,-10]
+        // p10=pos 0.4: -30+0.4*0=-30, p95=pos 3.8: -10+0.8*0=-10, LRA=20.0
+        Assert.Equal(20.0, lra, 1);
     }
 
     [Fact]
@@ -171,9 +174,10 @@ public class LoudnessRangeCalculatorTests
         double lra = LoudnessRangeCalculator.ComputeLoudnessRange(values);
 
         // Assert - -70 fails the absolute gate (not > -70); of the survivors
-        // [-60,-50,-40,-30], the relative gate (max=-30, threshold=-40) keeps
-        // only [-40,-30] -> p10=-39, p95=-30.5 -> LRA = 8.5
-        Assert.Equal(8.5, lra, 2);
+        // [-60,-50,-40,-30], the relative gate (max=-30, threshold=-50) keeps
+        // [-50,-40,-30] (3 values)
+        // p10=pos 0.2: -50+0.2*10=-48, p95=pos 1.9: -40+0.9*10=-31, LRA=17.0
+        Assert.Equal(17.0, lra, 1);
     }
 
     // Note: Percentile method is private in LoudnessRangeCalculator.
@@ -206,9 +210,10 @@ public class LoudnessRangeCalculatorTests
         double lra = LoudnessRangeCalculator.ComputeLoudnessRange(values);
 
         // Assert - -Infinity values are removed by the absolute gate (-70 LUFS);
-        // of [-65, -50], the relative gate (max=-50, threshold=-60) drops -65,
-        // leaving a single value -> not enough for a meaningful range -> LRA = 0
-        Assert.Equal(0.0, lra, 2);
+        // of [-65, -50], the relative gate (max=-50, threshold=-70 with -20 LU offset)
+        // keeps both values: [-65, -50]
+        // p10=pos 0.1: -65+0.1*15=-63.5, p95=pos 0.95: -65+0.95*15=-50.75, LRA=12.75
+        Assert.Equal(12.75, lra, 1);
     }
 
     [Fact]

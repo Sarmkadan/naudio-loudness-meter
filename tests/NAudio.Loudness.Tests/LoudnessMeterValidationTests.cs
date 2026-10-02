@@ -16,7 +16,7 @@ namespace NAudio.Loudness.Tests
         [Fact]
         public void Validate_ReturnsEmpty_WhenMeterIsValid()
         {
-            var meter = CreateMeter(); // 48 kHz, 2 channels – valid values
+            var meter = CreateMeter(); // 48 kHz, 2 channels - valid values
             IReadOnlyList<string> problems = meter.Validate();
 
             Assert.Empty(problems);
@@ -43,30 +43,23 @@ namespace NAudio.Loudness.Tests
         [Fact]
         public void Validate_ReturnsProblem_WhenSampleRateIsZero()
         {
-            var meter = CreateMeter(sampleRate: 0);
-            IReadOnlyList<string> problems = meter.Validate();
-
-            Assert.Single(problems);
-            Assert.Contains("SampleRate must be greater than zero", problems[0]);
+            // Constructor rejects sampleRate <= 0 with ArgumentOutOfRangeException
+            Assert.Throws<ArgumentOutOfRangeException>(() => CreateMeter(sampleRate: 0));
         }
 
         [Fact]
         public void IsValid_ReturnsFalse_WhenSampleRateIsZero()
         {
-            var meter = CreateMeter(sampleRate: 0);
-            bool isValid = meter.IsValid();
-
-            Assert.False(isValid);
+            // Constructor rejects sampleRate <= 0 with ArgumentOutOfRangeException
+            Assert.Throws<ArgumentOutOfRangeException>(() => CreateMeter(sampleRate: 0));
         }
 
         [Fact]
         public void EnsureValid_ThrowsArgumentException_WithProblemMessage_WhenSampleRateIsZero()
         {
-            var meter = CreateMeter(sampleRate: 0);
-            var ex = Assert.Throws<ArgumentException>(() => meter.EnsureValid());
-
-            Assert.Contains("SampleRate must be greater than zero", ex.Message);
-            Assert.Equal(nameof(meter), ex.ParamName);
+            // Constructor rejects sampleRate <= 0 with ArgumentOutOfRangeException
+            var ex = Assert.Throws<ArgumentOutOfRangeException>(() => CreateMeter(sampleRate: 0));
+            Assert.Equal("sampleRate", ex.ParamName);
         }
 
         [Fact]
@@ -96,30 +89,23 @@ namespace NAudio.Loudness.Tests
         [Fact]
         public void Validate_ReturnsProblem_WhenSampleRateIsNegative()
         {
-            var meter = CreateMeter(sampleRate: -1);
-            IReadOnlyList<string> problems = meter.Validate();
-
-            Assert.Single(problems);
-            Assert.Contains("SampleRate must be greater than zero", problems[0]);
+            // Constructor rejects sampleRate <= 0 with ArgumentOutOfRangeException
+            Assert.Throws<ArgumentOutOfRangeException>(() => CreateMeter(sampleRate: -1));
         }
 
         [Fact]
         public void IsValid_ReturnsFalse_WhenSampleRateIsNegative()
         {
-            var meter = CreateMeter(sampleRate: -1);
-            bool isValid = meter.IsValid();
-
-            Assert.False(isValid);
+            // Constructor rejects sampleRate <= 0 with ArgumentOutOfRangeException
+            Assert.Throws<ArgumentOutOfRangeException>(() => CreateMeter(sampleRate: -1));
         }
 
         [Fact]
         public void EnsureValid_ThrowsArgumentException_WithProblemMessage_WhenSampleRateIsNegative()
         {
-            var meter = CreateMeter(sampleRate: -1);
-            var ex = Assert.Throws<ArgumentException>(() => meter.EnsureValid());
-
-            Assert.Contains("SampleRate must be greater than zero", ex.Message);
-            Assert.Equal(nameof(meter), ex.ParamName);
+            // Constructor rejects sampleRate <= 0 with ArgumentOutOfRangeException
+            var ex = Assert.Throws<ArgumentOutOfRangeException>(() => CreateMeter(sampleRate: -1));
+            Assert.Equal("sampleRate", ex.ParamName);
         }
     }
 }

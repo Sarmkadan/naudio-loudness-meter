@@ -157,8 +157,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
         double actualMaxGainDb = Math.Min(requestedGainDb, maxSafeGainDb);
 
         // Ensure we never return a gain larger than requested (when ceiling is high or negative)
-        // and ensure we don't return NaN or negative values
-        actualMaxGainDb = Math.Max(0, Math.Min(requestedGainDb, actualMaxGainDb));
+        actualMaxGainDb = Math.Min(requestedGainDb, actualMaxGainDb);
 
         return (float)Math.Pow(10.0, actualMaxGainDb / 20.0);
     }

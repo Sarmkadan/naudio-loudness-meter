@@ -49,7 +49,7 @@ public class TruePeakMeterJsonExtensionsTests
 
         // Assert
         Assert.NotNull(json);
-        Assert.Contains("\r\n", json); // Has indentation
+        Assert.Contains("\n", json); // Has indentation
         Assert.Contains("truePeakDb", json);
         Assert.Contains("samplePeakDb", json);
     }

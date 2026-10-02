@@ -120,7 +120,7 @@ public class NormalizingProviderEdgeTests
     public void Gain_Clamped_WhenCeilingEnabled()
     {
         // Create a signal that when amplified would exceed ceiling
-        var signal = SignalGenerator.Sine(1000, 0.5, Fs, 0.1, 2);
+        var signal = SignalGenerator.Sine(1000, 1.0, Fs, 0.1, 2);
         var provider = new LoudnessNormalizingSampleProvider(
             new ArraySampleProvider(signal, Fs, 2),
             gainDb: 20.0, // Would make signal exceed ceiling

@@ -44,8 +44,8 @@ namespace NAudio.Loudness.Tests
             // Assert
             // Indented JSON should contain line breaks (environment newline)
             Assert.Contains(Environment.NewLine, json);
-            // Still must be valid JSON
-            var deserialized = JsonSerializer.Deserialize<LoudnessAnalysis>(json);
+            // Still must be valid JSON and round-trip correctly
+            var deserialized = LoudnessAnalysisJsonExtensions.FromJson(json);
             Assert.Equal(SampleAnalysis, deserialized);
         }
 

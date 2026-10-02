@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 /// <summary>
 /// True-peak meter per ITU-R BS.1770 Annex 2. Inter-sample peaks are estimated
 /// by 4x oversampling with a polyphase windowed-sinc FIR before taking the
@@ -37,6 +39,12 @@ public sealed class TruePeakMeter
 
     private double _truePeak;
     private double _samplePeak;
+
+    /// <summary>
+    /// Parameterless constructor for JSON deserialization. Creates a single-channel meter.
+    /// </summary>
+    [JsonConstructor]
+    public TruePeakMeter() : this(1) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TruePeakMeter"/> class.

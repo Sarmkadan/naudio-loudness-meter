@@ -15,7 +15,11 @@ public static class ChannelWeights
     /// Unknown layouts fall back to all-ones, which is correct for uncorrelated
     /// full-range channels and never over-counts.
     /// </remarks>
-    public static double[] ForChannelCount(int channels) => channels switch
+    public static double[] ForChannelCount(int channels)
+    {
+        if (channels <= 0)
+            throw new ArgumentException("Channel count must be greater than zero.", nameof(channels));
+        return channels switch
     {
         1 => new[] { 1.0 },
         2 => new[] { 1.0, 1.0 },
@@ -23,4 +27,5 @@ public static class ChannelWeights
         6 => new[] { 1.0, 1.0, 1.0, 0.0, 1.41, 1.41 }, // 5.1: L R C LFE Ls Rs
         _ => Enumerable.Repeat(1.0, channels).ToArray(),
     };
+    }
 }

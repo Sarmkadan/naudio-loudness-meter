@@ -45,7 +45,7 @@ public static class LoudnessAnalysisJsonExtensions
     {
         if (string.IsNullOrEmpty(json))
         {
-            throw new ArgumentException("Json string cannot be null or empty.", nameof(json));
+            return null;
         }
 
         try
