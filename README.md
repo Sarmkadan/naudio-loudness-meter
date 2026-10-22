@@ -32,6 +32,109 @@ the actual sample rate** by bilinear transform of the 48 kHz analogue
 prototype, so measurements stay correct at 44.1 / 48 / 96 kHz. (The fixed
 coefficient tables printed in BS.1770 are only exact at 48 kHz.)
 
+## Getting started
+
+### Install
+
+```bash
+dotnet add package NAudio.Loudness
+dotnet add package NAudio          # AudioFileReader and WaveInEvent live here
+```
+
+> The package is not yet published to nuget.org. Until it is, reference the
+> project directly from a checkout:
+> `dotnet add reference path/to/src/NAudio.Loudness/NAudio.Loudness.csproj`
+
+Requires .NET 8 or later (the library targets `net8.0`).
+
+### Measure a WAV file
+
+`LoudnessMeter` takes the sample rate and channel count of the audio it will
+receive: `new LoudnessMeter(int sampleRate, int channels)`. Pass the values from
+the file's `WaveFormat`, as the example does. The meter has no max properties, so
+the example polls it after each 100 ms block and keeps the highest readings.
+
+```csharp
+using System;
+using NAudio.Loudness;
+using NAudio.Wave;
+
+using var reader = new AudioFileReader("track.wav");
+int channels = reader.WaveFormat.Channels;
+
+var meter = new LoudnessMeter(reader.WaveFormat.SampleRate, channels);
+
+// 100 ms of audio per block: the meter updates its readings every 100 ms,
+// so polling after each block captures every momentary/short-term value.
+var buffer = new float[reader.WaveFormat.SampleRate / 10 * channels];
+double momentaryMax = double.NegativeInfinity;
+double shortTermMax = double.NegativeInfinity;
+
+int read;
+while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
+{
+    meter.AddSamples(buffer.AsSpan(0, read));
+    momentaryMax = Math.Max(momentaryMax, meter.MomentaryLufs);
+    shortTermMax = Math.Max(shortTermMax, meter.ShortTermLufs);
+}
+
+Console.WriteLine($"Integrated:     {meter.IntegratedLufs:0.0} LUFS");
+Console.WriteLine($"Momentary max:  {momentaryMax:0.0} LUFS");
+Console.WriteLine($"Short-term max: {shortTermMax:0.0} LUFS");
+```
+
+Expected output for a 10 s stereo 48 kHz 16-bit test tone (1 kHz sine, 5 s at
+-20 dBFS followed by 5 s at -26 dBFS). The integrated value matches ffmpeg's
+`ebur128` filter. Your numbers will differ for other files:
+
+```
+Integrated:     -25.1 LUFS
+Momentary max:  -23.1 LUFS
+Short-term max: -23.1 LUFS
+```
+
+### Real-time metering from a microphone (Windows)
+
+`WaveInEvent` uses the Windows multimedia API, so this example runs on Windows
+only. It captures 48 kHz mono 16-bit PCM in 100 ms buffers, and prints the
+momentary loudness for each buffer.
+
+```csharp
+using System;
+using NAudio.Loudness;
+using NAudio.Wave;
+
+const int sampleRate = 48000;
+const int channels = 1;
+
+var meter = new LoudnessMeter(sampleRate, channels);
+
+using var waveIn = new WaveInEvent
+{
+    WaveFormat = new WaveFormat(sampleRate, 16, channels),
+    BufferMilliseconds = 100,
+};
+
+waveIn.DataAvailable += (_, e) =>
+{
+    // WaveInEvent delivers 16-bit PCM bytes; convert them to floats in [-1, 1].
+    var samples = new float[e.BytesRecorded / 2];
+    for (int i = 0; i < samples.Length; i++)
+        samples[i] = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
+
+    meter.AddSamples(samples);
+    Console.WriteLine($"Momentary: {meter.MomentaryLufs,6:0.0} LUFS");
+};
+
+waveIn.StartRecording();
+Console.WriteLine("Listening. Press Enter to stop.");
+Console.ReadLine();
+waveIn.StopRecording();
+```
+
+If the device rejects 48 kHz mono 16-bit, pick a format it supports and pass the
+same sample rate and channel count to `LoudnessMeter`.
+
 ## Quick start
 
 ```csharp
