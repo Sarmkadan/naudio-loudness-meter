@@ -29,7 +29,7 @@ public sealed class TruePeakMeter
     private const double UnityGain = 1.0;
 
     // Factor for converting linear amplitude to decibels (20.0 * log10).
-    private const double DbPerDecadeFactor = 20.0;
+    private const double DbPerDecadeFactor = NAudio.Loudness.LoudnessConstants.DbPerAmplitudeDecade;
 
     private readonly int _channels;
     private readonly double[][] _phases;      // [phase][tap]

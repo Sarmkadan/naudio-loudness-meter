@@ -38,15 +38,15 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
     /// applying excessive gain. Hard clipping is still applied as a final fallback.
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> is <c>null</c>.</exception>
-    public LoudnessNormalizingSampleProvider(ISampleProvider source, double gainDb, double? truePeakCeilingDb = -1.0)
+    public LoudnessNormalizingSampleProvider(ISampleProvider source, double gainDb, double? truePeakCeilingDb = LoudnessConstants.DefaultTruePeakCeilingDbtp)
     {
         ArgumentNullException.ThrowIfNull(source);
 
         _source = source;
-        _gain = (float)Math.Pow(10.0, gainDb / 20.0);
+        _gain = (float)Math.Pow(10.0, gainDb / LoudnessConstants.DbPerAmplitudeDecade);
         _limit = truePeakCeilingDb.HasValue;
-        _ceilingLinear = _limit ? (float)Math.Pow(10.0, truePeakCeilingDb!.Value / 20.0) : 1.0f;
-        _truePeakCeilingDb = truePeakCeilingDb ?? -1.0;
+        _ceilingLinear = _limit ? (float)Math.Pow(10.0, truePeakCeilingDb!.Value / LoudnessConstants.DbPerAmplitudeDecade) : 1.0f;
+        _truePeakCeilingDb = truePeakCeilingDb ?? LoudnessConstants.DefaultTruePeakCeilingDbtp;
 
         // Calculate maximum safe gain to respect the ceiling
         _maxGainLinear = (_limit && gainDb > 0) ? CalculateMaxSafeGainLinear(gainDb) : _gain;
@@ -60,7 +60,7 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
     /// <summary>
     /// Gets the actual gain in dB that will be applied after ceiling constraints.
     /// </summary>
-    public double AppliedGainDb => 20.0 * Math.Log10(_maxGainLinear);
+    public double AppliedGainDb => LoudnessConstants.DbPerAmplitudeDecade * Math.Log10(_maxGainLinear);
 
     /// <summary>
     /// Gets the true‑peak ceiling in dBTP that is being enforced.
@@ -140,18 +140,14 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
 
         // Safety margin for inter‑sample peaks:
         // EBU R128 true peak can exceed sample peak by up to ~1.5 dB for complex signals
-        // ITU‑R BS.1770‑4 section 5.2 recommends a 1.1 dB margin for true peak measurement
-        const double SafetyMarginDb = 1.1;
+        double ceilingDb = Math.Log10(_ceilingLinear) * LoudnessConstants.DbPerAmplitudeDecade;
+        double effectiveCeilingDb = ceilingDb - LoudnessConstants.NormalizationSafetyMarginDb;
 
-        double ceilingDb = Math.Log10(_ceilingLinear) * 20.0;
-        double effectiveCeilingDb = ceilingDb - SafetyMarginDb;
-
-        // Use a sample peak estimate of 0.95 (conservative for most audio)
-        const double ConservativeSamplePeak = 0.95;
-        double maxSafeGainLinear = _ceilingLinear / ConservativeSamplePeak;
+        // Use a sample peak estimate of ConservativeSamplePeak (conservative for most audio)
+        double maxSafeGainLinear = _ceilingLinear / LoudnessConstants.ConservativeSamplePeak;
 
         // Convert to dB and compare with requested gain
-        double maxSafeGainDb = 20.0 * Math.Log10(maxSafeGainLinear);
+        double maxSafeGainDb = LoudnessConstants.DbPerAmplitudeDecade * Math.Log10(maxSafeGainLinear);
 
         // Apply the more restrictive of the two: requested gain or safety‑limited gain
         double actualMaxGainDb = Math.Min(requestedGainDb, maxSafeGainDb);
@@ -159,6 +155,6 @@ public sealed class LoudnessNormalizingSampleProvider : ISampleProvider
         // Ensure we never return a gain larger than requested (when ceiling is high or negative)
         actualMaxGainDb = Math.Min(requestedGainDb, actualMaxGainDb);
 
-        return (float)Math.Pow(10.0, actualMaxGainDb / 20.0);
+        return (float)Math.Pow(10.0, actualMaxGainDb / LoudnessConstants.DbPerAmplitudeDecade);
     }
 }

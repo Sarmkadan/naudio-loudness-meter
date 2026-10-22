@@ -8,15 +8,13 @@ namespace NAudio.Loudness;
 /// </summary>
 public sealed class LoudnessMeterOptions
 {
-    private const int MinSampleRate = 8000;
-    private const int MaxSampleRate = 384000;
-    private const int MinChannels = 1;
+    private const int MinChannels = LoudnessConstants.MinChannels;
 
     // BS.1770 channel weights are defined up to 5 channels (L R C Ls Rs).
-    private const int MaxChannels = 5;
+    private const int MaxChannels = LoudnessConstants.MaxChannels;
 
     /// <summary>Sample rate in Hz. Must be between 8000 and 384000.</summary>
-    public int SampleRate { get; init; } = 48000;
+    public int SampleRate { get; init; } = LoudnessConstants.DefaultSampleRate;
 
     /// <summary>Number of interleaved channels. Must be between 1 and 5.</summary>
     public int Channels { get; init; } = 2;
@@ -28,14 +26,14 @@ public sealed class LoudnessMeterOptions
     /// length, which BS.1770 fixes at 400 ms; changing it departs from the standard.
     /// </summary>
     public int MomentaryWindowMs { get; init; } =
-        (int)Math.Round(LoudnessConstants.MomentaryBlocks * LoudnessConstants.SubBlockSeconds * 1000.0);
+        (int)Math.Round(LoudnessConstants.MomentaryBlockSeconds * 1000.0);
 
     /// <summary>
     /// Short-term window in milliseconds (3000 ms by default). Must be positive and at least
     /// <see cref="MomentaryWindowMs"/>. Rounded to 100 ms sub-blocks, as for the momentary window.
     /// </summary>
     public int ShortTermWindowMs { get; init; } =
-        (int)Math.Round(LoudnessConstants.ShortTermBlocks * LoudnessConstants.SubBlockSeconds * 1000.0);
+        (int)Math.Round(LoudnessConstants.ShortTermBlockSeconds * 1000.0);
 
     /// <summary>
     /// Absolute gate in LUFS (-70 by default). Blocks below this level are excluded from the
@@ -62,11 +60,7 @@ public sealed class LoudnessMeterOptions
     /// </exception>
     public void Validate()
     {
-        if (SampleRate < MinSampleRate || SampleRate > MaxSampleRate)
-        {
-            throw new ArgumentOutOfRangeException(nameof(SampleRate), SampleRate,
-                $"SampleRate must be between {MinSampleRate} and {MaxSampleRate} Hz, but was {SampleRate}.");
-        }
+        LoudnessConstants.EnsureSupportedSampleRate(SampleRate, nameof(SampleRate));
 
         if (Channels < MinChannels || Channels > MaxChannels)
         {

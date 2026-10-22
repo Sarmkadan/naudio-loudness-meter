@@ -41,10 +41,10 @@ public static class LoudnessRangeCalculator
         // Sort the gated values for percentile calculation.
         var sorted = gatedValues.OrderBy(v => v).ToArray();
 
-        double p10 = Percentile(sorted, 0.10);
-        double p95 = Percentile(sorted, 0.95);
+        double low = Percentile(sorted, LoudnessConstants.LraLowPercentile);
+        double high = Percentile(sorted, LoudnessConstants.LraHighPercentile);
 
-        return p95 - p10;
+        return high - low;
     }
 
     /// <summary>

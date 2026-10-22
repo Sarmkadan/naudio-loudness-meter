@@ -12,8 +12,8 @@ namespace NAudio.Loudness;
 /// </summary>
 public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISampleProvider
 {
-    private const double MinimumMeasurementSeconds = 0.4;
-    private const double GainSmoothingTimeSeconds = 1.0;
+    private const double MinimumMeasurementSeconds = LoudnessConstants.MomentaryBlockSeconds;
+    private const double GainSmoothingTimeSeconds = LoudnessConstants.AdaptiveGainSmoothingSeconds;
 
     private readonly ISampleProvider _source;
     private readonly double _targetLufs;
@@ -31,13 +31,13 @@ public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISamplePr
     /// <param name="source">The source provider.</param>
     /// <param name="targetLufs">The target integrated loudness in LUFS.</param>
     /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
-    public OnePassAdaptiveLoudnessNormalizingSampleProvider(ISampleProvider source, double targetLufs, double? truePeakCeilingDb = -1.0)
+    public OnePassAdaptiveLoudnessNormalizingSampleProvider(ISampleProvider source, double targetLufs, double? truePeakCeilingDb = LoudnessConstants.DefaultTruePeakCeilingDbtp)
     {
         ArgumentNullException.ThrowIfNull(source);
         _source = source;
         _targetLufs = targetLufs;
         _limit = truePeakCeilingDb.HasValue;
-        _ceilingLinear = _limit ? (float)Math.Pow(10.0, truePeakCeilingDb!.Value / 20.0) : 1.0f;
+        _ceilingLinear = _limit ? (float)Math.Pow(10.0, truePeakCeilingDb!.Value / LoudnessConstants.DbPerAmplitudeDecade) : 1.0f;
         _meter = new LoudnessMeter(source.WaveFormat.SampleRate, source.WaveFormat.Channels);
         _minimumMeasurementSamples = (long)Math.Ceiling(
             source.WaveFormat.SampleRate * source.WaveFormat.Channels * MinimumMeasurementSeconds);
@@ -63,7 +63,7 @@ public sealed class OnePassAdaptiveLoudnessNormalizingSampleProvider : ISamplePr
         bool measurementAvailable = double.IsFinite(currentLufs)
             && _samplesProcessed + read >= _minimumMeasurementSamples;
         float targetGainLinear = measurementAvailable
-            ? (float)Math.Pow(10.0, (_targetLufs - currentLufs) / 20.0)
+            ? (float)Math.Pow(10.0, (_targetLufs - currentLufs) / LoudnessConstants.DbPerAmplitudeDecade)
             : 1.0f;
 
         for (int i = 0; i < read; i++)

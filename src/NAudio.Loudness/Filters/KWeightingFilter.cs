@@ -74,13 +74,13 @@ public sealed class KWeightingFilter
     // Stage 1 – high shelf ("pre‑filter" modelling the acoustic effect of the head).
     private static Biquad BuildShelf(int fs)
     {
-        const double f0 = 1681.974450955533;
-        const double g = 3.999843853973347;
-        const double q = 0.7071752369554196;
+        const double f0 = LoudnessConstants.KShelfFrequencyHz;
+        const double g = LoudnessConstants.KShelfGainDb;
+        const double q = LoudnessConstants.KShelfQ;
 
         double k = Math.Tan(Math.PI * f0 / fs);
-        double vh = Math.Pow(10.0, g / 20.0);
-        double vb = Math.Pow(vh, 0.4996667741545416);
+        double vh = Math.Pow(10.0, g / LoudnessConstants.DbPerAmplitudeDecade);
+        double vb = Math.Pow(vh, LoudnessConstants.KShelfVbExponent);
         double denom = 1.0 + k / q + k * k;
 
         double b0 = (vh + vb * k / q + k * k) / denom;
@@ -95,8 +95,8 @@ public sealed class KWeightingFilter
     // Stage 2 – RLB high‑pass.
     private static Biquad BuildHighPass(int fs)
     {
-        const double f0 = 38.13547087602444;
-        const double q = 0.5003270373238773;
+        const double f0 = LoudnessConstants.KHighPassFrequencyHz;
+        const double q = LoudnessConstants.KHighPassQ;
 
         double k = Math.Tan(Math.PI * f0 / fs);
         double denom = 1.0 + k / q + k * k;

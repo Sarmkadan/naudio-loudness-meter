@@ -16,7 +16,7 @@ public sealed class LoudnessMeter
 {
     // Magic numbers moved to LoudnessConstants
     private const double SubBlockSeconds = LoudnessConstants.SubBlockSeconds;
-    private const double Offset = -0.691;    // BS.1770 loudness offset
+    private const double Offset = LoudnessConstants.LoudnessOffsetLkfs;
 
     private readonly int _channels;
     private readonly double[] _weights;
@@ -185,8 +185,8 @@ public sealed class LoudnessMeter
         }
         _subBlockSampleCount = 0;
 
-        // A completed sub-block closes one 400 ms gating block (75 % overlap
-        // means a new gating block every 100 ms).
+        // A completed sub-block closes one 400 ms gating block. With 75 % overlap the
+        // hop between gating blocks is GatingHopBlocks (one sub-block, 100 ms).
         if (_completedSubBlockCount >= _momentaryBlocks)
         {
             var energy = AverageEnergy(_completedSubBlockCount - _momentaryBlocks, _momentaryBlocks);
@@ -330,12 +330,13 @@ public sealed class LoudnessMeter
         if (gated.Count < 2)
             return 0.0;
 
-        return Percentile(gated, 95.0) - Percentile(gated, 10.0);
+        return Percentile(gated, LoudnessConstants.LraHighPercentile) - Percentile(gated, LoudnessConstants.LraLowPercentile);
     }
 
+    // p is a fraction in [0, 1].
     private static double Percentile(IReadOnlyList<double> sorted, double p)
     {
-        double rank = (p / 100.0) * (sorted.Count - 1);
+        double rank = p * (sorted.Count - 1);
         int lo = (int)Math.Floor(rank);
         int hi = (int)Math.Ceiling(rank);
         if (lo == hi)
