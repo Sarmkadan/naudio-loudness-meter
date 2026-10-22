@@ -5,5 +5,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NAudio.Loudness.Tests/NAudio.Loudness.Tests.csproj" />
+    <Project Path="tests/NAudio.Loudness.IntegrationTests/NAudio.Loudness.IntegrationTests.csproj" />
   </Folder>
 </Solution>
