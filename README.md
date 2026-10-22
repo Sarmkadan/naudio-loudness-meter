@@ -478,6 +478,129 @@ double o2 = stateful.Process(0.5);     // differs from o1 due to accumulated sta
 stateful.Reset();
 ```
 
+## Advanced usage
+
+`LoudnessMeter` is built from two public building blocks in `NAudio.Loudness.Filters`.
+You can use them directly when you need the K-weighted signal itself rather than a LUFS number.
+
+- **`Biquad`** is a direct-form I second-order section, `Process(double)` / `Reset()`. It holds
+  its own delay line, so use one instance per channel.
+- **`KWeightingFilter`** is the BS.1770 K-weighting: the high-shelf pre-filter followed by the RLB
+  high-pass, each a `Biquad`. Its coefficients are derived for the sample rate you pass to the constructor.
+  It also keeps per-instance state, so use one instance per channel.
+
+### K-weighted RMS of a float buffer
+
+This example builds a stereo test tone, runs each channel through its own `KWeightingFilter`
+in place, and computes the RMS of the weighted signal.
+
+```csharp
+using System;
+using NAudio.Loudness.Filters;
+
+const int sampleRate = 48000;
+const int channels = 2;
+const int frames = sampleRate; // one second
+
+// Interleaved test signal: 1 kHz sine at -20 dBFS on both channels.
+var buffer = new float[frames * channels];
+for (int n = 0; n < frames; n++)
+{
+    float v = 0.1f * (float)Math.Sin(2.0 * Math.PI * 1000.0 * n / sampleRate);
+    for (int c = 0; c < channels; c++)
+        buffer[n * channels + c] = v;
+}
+
+// One filter per channel: the filter state must not be shared across channels.
+var filters = new KWeightingFilter[channels];
+for (int c = 0; c < channels; c++)
+    filters[c] = new KWeightingFilter(sampleRate);
+
+// Filter in place, interleaved.
+for (int i = 0; i < buffer.Length; i++)
+    buffer[i] = (float)filters[i % channels].Process(buffer[i]);
+
+// RMS of the weighted signal.
+double sumOfSquares = 0.0;
+foreach (float s in buffer)
+    sumOfSquares += (double)s * s;
+
+double rms = Math.Sqrt(sumOfSquares / buffer.Length);
+Console.WriteLine($"K-weighted RMS: {rms:0.0000} ({20.0 * Math.Log10(rms):0.0} dBFS)");
+```
+
+`KWeightingFilter.ProcessSamples(double[])` does the same for a `double[]` of one channel.
+It returns a new array rather than filtering in place.
+
+### The BS.1770 filter stages
+
+`KWeightingFilter` is the cascade of two `Biquad` stages. The nominal parameters below are the
+48 kHz values from BS.1770. The code re-derives them for other sample rates by bilinear transform.
+
+| Stage | Type | Nominal frequency | Gain | Q | Purpose |
+| --- | --- | --- | --- | --- | --- |
+| 1. Pre-filter | 2nd-order high shelf | 1681.97 Hz | +4.0 dB | 0.7072 | Models the acoustic effect of the head |
+| 2. RLB high-pass | 2nd-order high-pass | 38.14 Hz | 0 dB | 0.5003 | Removes sub-audible content (revised low-frequency B-curve) |
+
+### `LoudnessConstants`
+
+`LoudnessConstants` is a public static class with the values the meter uses:
+
+- **Window sizes:** `SubBlockSeconds` (0.1 s), `MomentaryBlocks` (4, so 400 ms),
+  `ShortTermBlocks` (30, so 3 s), and `GatingOverlapFactor` (0.75).
+- **Integrated gating:** `AbsoluteGateLufs` (-70 LUFS) and `RelativeGateLu` (-10 LU).
+- **Loudness range gating:** `LraAbsoluteGateThreshold` (-70 LUFS) and `LraRelativeGateOffset` (-20 LU).
+
+Reference them when your own code needs to match the meter's windows or gates. They are `const`, so
+they cannot be changed at runtime.
+
+### Normalization to -23 LUFS (EBU R128)
+
+This example measures a buffer, computes the gain as `target - measured` in dB, and applies that gain
+to the samples. It converts the gain to a linear factor first.
+
+```csharp
+using System;
+using NAudio.Loudness;
+
+const int sampleRate = 48000;
+const int channels = 2;
+const double targetLufs = -23.0; // EBU R128 programme loudness
+
+// Stand-in for real audio: a 1 kHz sine at -20 dBFS, stereo, 10 s.
+var samples = new float[sampleRate * channels * 10];
+for (int n = 0; n < sampleRate * 10; n++)
+{
+    float v = 0.1f * (float)Math.Sin(2.0 * Math.PI * 1000.0 * n / sampleRate);
+    samples[n * channels] = v;
+    samples[n * channels + 1] = v;
+}
+
+// 1. Measure.
+var meter = new LoudnessMeter(sampleRate, channels);
+meter.AddSamples(samples);
+double measuredLufs = meter.IntegratedLufs;
+if (double.IsNegativeInfinity(measuredLufs))
+    throw new InvalidOperationException("Input is silent or below the -70 LUFS gate; nothing to normalize.");
+
+// 2. Gain in dB.
+double gainDb = targetLufs - measuredLufs;
+
+// 3. Apply to the samples (dB -> linear factor).
+float linearGain = (float)Math.Pow(10.0, gainDb / 20.0);
+for (int i = 0; i < samples.Length; i++)
+    samples[i] *= linearGain;
+
+// Re-measure to confirm the target.
+var check = new LoudnessMeter(sampleRate, channels);
+check.AddSamples(samples);
+Console.WriteLine($"Measured {measuredLufs:0.00} LUFS, gain {gainDb:+0.00;-0.00} dB, now {check.IntegratedLufs:0.00} LUFS");
+```
+
+Check the true peak before writing the result. A large gain can push peaks over full scale,
+and the scaling loop above does not limit them. To normalize with a true-peak ceiling, use
+`LoudnessNormalizingSampleProvider` with `truePeakCeilingDb: -1.0` instead.
+
 ## License
 
 MIT
