@@ -1,9 +1,7 @@
 using System;
 
-/// <summary>
-/// Provides constant values used throughout the NAudio.Loudness implementation.
-/// The values are defined by the ITU‑R BS.1770 / EBU R 128 specifications.
-/// </summary>
+// Provides constant values used throughout the NAudio.Loudness implementation.
+// The values are defined by the ITU‑R BS.1770 / EBU R 128 specifications.
 namespace NAudio.Loudness
 {
     /// <summary>

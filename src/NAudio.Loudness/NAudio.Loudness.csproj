@@ -10,16 +10,29 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
 
+    <!-- NuGet package metadata -->
     <PackageId>NAudio.Loudness</PackageId>
     <Version>0.4.0</Version>
     <Authors>Vladyslav Zaiets</Authors>
-    <Description>EBU R128 / ITU-R BS.1770 loudness measurement (integrated, short-term, momentary LUFS), true-peak metering and loudness normalization for NAudio.</Description>
-    <PackageTags>naudio;audio;loudness;lufs;ebu-r128;bs1770;true-peak;normalization;broadcast</PackageTags>
+    <Copyright>Copyright (c) 2026 Vladyslav Zaiets</Copyright>
+    <Description>Pure-managed EBU R128 / ITU-R BS.1770-4 loudness measurement for NAudio: momentary, short-term and integrated LUFS, loudness range (LRA), true peak (dBTP) and loudness normalization for ISampleProvider.</Description>
+    <PackageTags>naudio;loudness;lufs;bs1770;r128;audio</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/Sarmkadan/naudio-loudness-meter</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="NAudio.Core" Version="2.2.1" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
