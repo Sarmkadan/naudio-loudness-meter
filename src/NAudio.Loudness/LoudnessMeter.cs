@@ -16,16 +16,16 @@ public sealed class LoudnessMeter
 {
     // Magic numbers moved to LoudnessConstants
     private const double SubBlockSeconds = LoudnessConstants.SubBlockSeconds;
-    private const int MomentaryBlocks = LoudnessConstants.MomentaryBlocks;   // 400 ms
-    private const int ShortTermBlocks = LoudnessConstants.ShortTermBlocks;  // 3 s
-    private const double AbsoluteGateLufs = LoudnessConstants.AbsoluteGateLufs;
-    private const double RelativeGateLu = LoudnessConstants.RelativeGateLu;
     private const double Offset = -0.691;    // BS.1770 loudness offset
 
     private readonly int _channels;
     private readonly double[] _weights;
     private readonly KWeightingFilter[] _filters;
     private readonly int _subBlockSize;
+    private readonly int _momentaryBlocks;   // 400 ms by default
+    private readonly int _shortTermBlocks;   // 3 s by default
+    private readonly double _absoluteGateLufs;
+    private readonly double _relativeGateLu;
 
     // Current (partial) 100 ms sub-block.
     private readonly double[] _sumSquares;
@@ -60,6 +60,34 @@ public sealed class LoudnessMeter
     {
     }
 
+    /// <summary>Initializes a loudness meter from validated options.</summary>
+    /// <param name="options">The meter configuration. Its defaults are the BS.1770 / EBU R 128 values.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">An option is outside its allowed range. See <see cref="LoudnessMeterOptions.Validate"/>.</exception>
+    /// <exception cref="ArgumentException">Two related options are inconsistent. See <see cref="LoudnessMeterOptions.Validate"/>.</exception>
+    public LoudnessMeter(LoudnessMeterOptions options)
+        : this(options, ValidatedChannelWeights(options))
+    {
+    }
+
+    private LoudnessMeter(LoudnessMeterOptions options, double[] channelWeights)
+        : this(options.SampleRate, options.Channels, channelWeights,
+               WindowBlocks(options.MomentaryWindowMs), WindowBlocks(options.ShortTermWindowMs),
+               options.AbsoluteGateLufs, options.RelativeGateLu)
+    {
+    }
+
+    private static double[] ValidatedChannelWeights(LoudnessMeterOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
+        return ChannelWeights.ForChannelCount(options.Channels);
+    }
+
+    // Converts a window length to whole 100 ms sub-blocks, with a minimum of one.
+    private static int WindowBlocks(int windowMs) =>
+        Math.Max(1, (int)Math.Round(windowMs / (SubBlockSeconds * 1000.0)));
+
     /// <summary>Initializes a loudness meter using the specified channel weights.</summary>
     /// <param name="sampleRate">The sample rate in Hz.</param>
     /// <param name="channels">The number of interleaved audio channels.</param>
@@ -72,6 +100,18 @@ public sealed class LoudnessMeter
     /// <paramref name="channelWeights"/> does not contain one finite, non-negative weight per channel.
     /// </exception>
     public LoudnessMeter(int sampleRate, int channels, double[] channelWeights)
+        : this(sampleRate, channels, channelWeights,
+               LoudnessConstants.MomentaryBlocks, LoudnessConstants.ShortTermBlocks,
+               LoudnessConstants.AbsoluteGateLufs, LoudnessConstants.RelativeGateLu)
+    {
+    }
+
+    // Shared core for every public constructor. Takes window lengths in sub-blocks and
+    // does not apply LoudnessMeterOptions' channel range, so the legacy constructors
+    // keep accepting layouts such as 5.1 (6 channels).
+    private LoudnessMeter(int sampleRate, int channels, double[] channelWeights,
+                          int momentaryBlocks, int shortTermBlocks,
+                          double absoluteGateLufs, double relativeGateLu)
     {
         if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
         if (channels <= 0) throw new ArgumentOutOfRangeException(nameof(channels));
@@ -88,8 +128,12 @@ public sealed class LoudnessMeter
         _filters = new KWeightingFilter[channels];
         for (int c = 0; c < channels; c++)
             _filters[c] = new KWeightingFilter(sampleRate);
+        _momentaryBlocks = momentaryBlocks;
+        _shortTermBlocks = shortTermBlocks;
+        _absoluteGateLufs = absoluteGateLufs;
+        _relativeGateLu = relativeGateLu;
         _sumSquares = new double[channels];
-        _subBlocks = new double[ShortTermBlocks * channels];
+        _subBlocks = new double[shortTermBlocks * channels];
     }
 
     public int SampleRate { get; }
@@ -122,15 +166,15 @@ public sealed class LoudnessMeter
     private void CompleteSubBlock()
     {
         int destinationBlock;
-        if (_completedSubBlockCount < ShortTermBlocks)
+        if (_completedSubBlockCount < _shortTermBlocks)
         {
-            destinationBlock = (_subBlockStart + _completedSubBlockCount) % ShortTermBlocks;
+            destinationBlock = (_subBlockStart + _completedSubBlockCount) % _shortTermBlocks;
             _completedSubBlockCount++;
         }
         else
         {
             destinationBlock = _subBlockStart;
-            _subBlockStart = (_subBlockStart + 1) % ShortTermBlocks;
+            _subBlockStart = (_subBlockStart + 1) % _shortTermBlocks;
         }
 
         int destination = destinationBlock * _channels;
@@ -143,23 +187,23 @@ public sealed class LoudnessMeter
 
         // A completed sub-block closes one 400 ms gating block (75 % overlap
         // means a new gating block every 100 ms).
-        if (_completedSubBlockCount >= MomentaryBlocks)
+        if (_completedSubBlockCount >= _momentaryBlocks)
         {
-            var energy = AverageEnergy(_completedSubBlockCount - MomentaryBlocks, MomentaryBlocks);
+            var energy = AverageEnergy(_completedSubBlockCount - _momentaryBlocks, _momentaryBlocks);
             _totalBlockCount++;
-            if (LoudnessFromEnergy(energy) >= AbsoluteGateLufs)
+            if (LoudnessFromEnergy(energy) >= _absoluteGateLufs)
                 _gatingBlockEnergy.Add(energy);
         }
 
-        if (_completedSubBlockCount == ShortTermBlocks)
-            _shortTermLoudness.Add(LoudnessFromEnergy(AverageEnergy(0, ShortTermBlocks)));
+        if (_completedSubBlockCount == _shortTermBlocks)
+            _shortTermLoudness.Add(LoudnessFromEnergy(AverageEnergy(0, _shortTermBlocks)));
     }
 
     /// <summary>Loudness of the most recent 400 ms, or -inf if not enough audio yet.</summary>
-    public double MomentaryLufs => WindowLoudness(MomentaryBlocks);
+    public double MomentaryLufs => WindowLoudness(_momentaryBlocks);
 
     /// <summary>Loudness of the most recent 3 s, or -inf if not enough audio yet.</summary>
-    public double ShortTermLufs => WindowLoudness(ShortTermBlocks);
+    public double ShortTermLufs => WindowLoudness(_shortTermBlocks);
 
     /// <summary>
     /// Gated integrated loudness over everything fed so far. Returns
@@ -175,7 +219,7 @@ public sealed class LoudnessMeter
 
             // Ungated mean over absolute-gated blocks -> relative threshold.
             var mean = MeanEnergy(_gatingBlockEnergy);
-            double relativeThreshold = LoudnessFromEnergy(mean) + RelativeGateLu;
+            double relativeThreshold = LoudnessFromEnergy(mean) + _relativeGateLu;
 
             var kept = new List<double[]>();
             foreach (var block in _gatingBlockEnergy)
@@ -237,7 +281,7 @@ public sealed class LoudnessMeter
         var acc = new double[_channels];
         for (int i = 0; i < count; i++)
         {
-            int block = (_subBlockStart + start + i) % ShortTermBlocks;
+            int block = (_subBlockStart + start + i) % _shortTermBlocks;
             int source = block * _channels;
             for (int c = 0; c < _channels; c++)
                 acc[c] += _subBlocks[source + c];
@@ -275,13 +319,13 @@ public sealed class LoudnessMeter
         if (_shortTermLoudness.Count == 0)
             return 0.0;
 
-        var shortTerm = _shortTermLoudness.Where(l => l >= AbsoluteGateLufs).ToList();
+        var shortTerm = _shortTermLoudness.Where(l => l >= _absoluteGateLufs).ToList();
 
         if (shortTerm.Count == 0)
             return 0.0;
 
         double meanLoudness = shortTerm.Average();
-        double relGate = meanLoudness + RelativeGateLu;
+        double relGate = meanLoudness + _relativeGateLu;
         var gated = shortTerm.Where(l => l >= relGate).OrderBy(l => l).ToList();
         if (gated.Count < 2)
             return 0.0;
