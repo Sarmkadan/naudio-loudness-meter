@@ -177,12 +177,8 @@ public static class LoudnessMeterTestsExtensions
     /// <param name="lufs1">The first loudness value.</param>
     /// <param name="lufs2">The second loudness value.</param>
     /// <returns>The loudness difference in LU, or <see cref="double.NaN"/> if either value is negative infinity.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="lufs1"/> or <paramref name="lufs2"/> is <see langword="null"/>.</exception>
     public static double LoudnessDifference(this double lufs1, double lufs2)
     {
-        ArgumentNullException.ThrowIfNull(lufs1);
-        ArgumentNullException.ThrowIfNull(lufs2);
-
         if (lufs1 is double.NegativeInfinity || lufs2 is double.NegativeInfinity)
         {
             return double.NaN;

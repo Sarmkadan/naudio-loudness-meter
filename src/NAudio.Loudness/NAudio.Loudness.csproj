@@ -2,9 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
     <RootNamespace>NAudio.Loudness</RootNamespace>
     <AssemblyName>NAudio.Loudness</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -23,7 +20,6 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EnablePackageValidation>true</EnablePackageValidation>
-    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>
