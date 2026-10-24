@@ -40,7 +40,7 @@ Do not add files to the stray locations left over from earlier AI-assisted editi
 
 ## Code style
 
-There is no `.editorconfig` and no analyzer ruleset in the repository, and the build does not treat warnings as errors. Follow the conventions below and match the surrounding code.
+The repository has an `.editorconfig` with the whitespace and C# naming/style rules, but no analyzer ruleset, and the build does not treat warnings as errors. Its C# style rules are advisory suggestions, so they show up in the IDE but not in `dotnet build`. Follow the conventions below and match the surrounding code.
 
 - `Nullable` and `ImplicitUsings` are enabled in every project. Keep new code null-safe.
 - The build should not gain new warnings. The solution currently has two existing `CA2264` warnings in `LoudnessMeterTestsExtensions.cs`; do not add to them.
