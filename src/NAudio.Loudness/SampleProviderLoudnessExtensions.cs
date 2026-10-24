@@ -35,7 +35,7 @@ public static class SampleProviderLoudnessExtensions
 
         int channels = source.WaveFormat.Channels;
         var meter = new LoudnessMeter(source.WaveFormat.SampleRate, channels);
-        var peak = new TruePeakMeter(channels);
+        var peak = new TruePeakMeter(channels, source.WaveFormat.SampleRate);
 
         var buffer = new float[bufferFrames * channels];
         int read;

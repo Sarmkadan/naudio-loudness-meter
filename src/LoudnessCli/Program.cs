@@ -289,7 +289,7 @@ static LoudnessAnalysis MeasureLoudnessWithProgress(AudioFileReader reader, bool
 {
     int channels = reader.WaveFormat.Channels;
     var meter = new LoudnessMeter(reader.WaveFormat.SampleRate, channels);
-    var peak = new TruePeakMeter(channels);
+    var peak = new TruePeakMeter(channels, reader.WaveFormat.SampleRate);
 
     var bufferFrames = 4096;
     var buffer = new float[bufferFrames * channels];

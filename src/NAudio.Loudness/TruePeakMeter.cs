@@ -1,20 +1,30 @@
 using System.Text.Json.Serialization;
+using NAudio.Loudness;
 
 /// <summary>
-/// True-peak meter per ITU-R BS.1770 Annex 2. Inter-sample peaks are estimated
-/// by 4x oversampling with a polyphase windowed-sinc FIR before taking the
-/// absolute maximum. Sample peak is tracked in parallel for comparison.
+/// True-peak meter per ITU-R BS.1770 Annex 2. Inter-sample peaks are estimated by
+/// oversampling with a polyphase windowed-sinc FIR before taking the absolute maximum.
+/// The oversampling factor is chosen from the input sample rate so that the measurement
+/// grid is at least <see cref="LoudnessConstants.TruePeakTargetSampleRate"/> (192 kHz):
+/// 4x at 48 kHz, 2x at 96 kHz, and 1x (no interpolation) at 192 kHz and above.
+/// Sample peak is tracked in parallel for comparison.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Accuracy bound.</b> The meter evaluates the interpolated waveform on a grid of
+/// R = <see cref="OversampleFactor"/> x fs (R is at least 192 kHz). For a single sinusoid of
+/// frequency f, that grid can under-report the continuous-time peak by at most
+/// 20 log10(1 / cos(pi f / R)) dB. The bound is 0.47 dB at f = 20 kHz, 0.17 dB at 12 kHz and
+/// 3.01 dB at f = R/4 (48 kHz when R = 192 kHz); it grows without limit only as f approaches R/2.
+/// The 12-tap-per-phase interpolator adds passband ripple on top of this; that term
+/// is not included in the bound. At 1x there is no interpolation, so the reported true peak
+/// equals the sample peak and the bound above applies to the native grid.
+/// </para>
+/// </remarks>
 public sealed class TruePeakMeter
 {
-    // Four-times oversampling follows the true-peak measurement model in BS.1770 Annex 2.
-    private const int OversampleFactor = 4;
-
     // Polyphase FIR length used to approximate the BS.1770 Annex 2 interpolation filter.
     private const int TapsPerPhase = 12;
-
-    // Normalized cutoff frequency for the interpolation filter (1/oversample) as per BS.1770 Annex 2.
-    private const double FilterCutoffRatio = 1.0 / OversampleFactor;
 
     // Divisor for calculating the center of the FIR filter (length-1)/2.0.
     private const double FilterCenterDivisor = 2.0;
@@ -32,6 +42,7 @@ public sealed class TruePeakMeter
     private const double DbPerDecadeFactor = NAudio.Loudness.LoudnessConstants.DbPerAmplitudeDecade;
 
     private readonly int _channels;
+    private readonly int _oversampleFactor;
     private readonly double[][] _phases;      // [phase][tap]
     private readonly double[][] _history;     // [channel][tap] circular delay line
     private readonly int[] _pos;
@@ -41,21 +52,37 @@ public sealed class TruePeakMeter
     private double _samplePeak;
 
     /// <summary>
-    /// Parameterless constructor for JSON deserialization. Creates a single-channel meter.
+    /// Parameterless constructor for JSON deserialization. Creates a single-channel meter at
+    /// <see cref="LoudnessConstants.DefaultSampleRate"/> (48 kHz, 4x oversampling).
     /// </summary>
     [JsonConstructor]
     public TruePeakMeter() : this(1) { }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="TruePeakMeter"/> class.
+    /// Initializes a new instance of the <see cref="TruePeakMeter"/> class for
+    /// <see cref="LoudnessConstants.DefaultSampleRate"/> (48 kHz, 4x oversampling).
     /// </summary>
     /// <param name="channels">Number of channels in the input signal. Must be greater than zero.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="channels"/> is less than or equal to zero.</exception>
-    public TruePeakMeter(int channels)
+    public TruePeakMeter(int channels) : this(channels, LoudnessConstants.DefaultSampleRate) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TruePeakMeter"/> class for the given input sample rate.
+    /// The oversampling factor is selected by <see cref="GetOversampleFactor"/>.
+    /// </summary>
+    /// <param name="channels">Number of channels in the input signal. Must be greater than zero.</param>
+    /// <param name="sampleRate">Input sample rate in Hz, between <see cref="LoudnessConstants.MinSampleRate"/> and <see cref="LoudnessConstants.MaxSampleRate"/>.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="channels"/> is less than or equal to zero, or <paramref name="sampleRate"/> is outside the supported range.
+    /// </exception>
+    public TruePeakMeter(int channels, int sampleRate)
     {
-        if (channels <= 0) throw new ArgumentOutOfRangeException(nameof(channels));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(channels);
+        LoudnessConstants.EnsureSupportedSampleRate(sampleRate);
+
         _channels = channels;
-        _phases = BuildPolyphase();
+        _oversampleFactor = GetOversampleFactor(sampleRate);
+        _phases = BuildPolyphase(_oversampleFactor);
         _history = new double[channels][];
         _pos = new int[channels];
         _channelTruePeaks = new double[channels];
@@ -91,7 +118,7 @@ public sealed class TruePeakMeter
         _pos[channel] = (pos + 1) % TapsPerPhase;
 
         // Convolve each polyphase branch against the delay line.
-        for (int p = 0; p < OversampleFactor; p++)
+        for (int p = 0; p < _oversampleFactor; p++)
         {
             var coeffs = _phases[p];
             double acc = 0.0;
@@ -105,6 +132,27 @@ public sealed class TruePeakMeter
             if (a > _truePeak) _truePeak = a;
             if (a > _channelTruePeaks[channel]) _channelTruePeaks[channel] = a;
         }
+    }
+
+    /// <summary>
+    /// Number of interpolated points per input sample (1 = no interpolation). Chosen so that
+    /// <c>OversampleFactor x fs</c> is at least <see cref="LoudnessConstants.TruePeakTargetSampleRate"/>.
+    /// </summary>
+    public int OversampleFactor => _oversampleFactor;
+
+    /// <summary>
+    /// Returns the oversampling factor used for true-peak measurement at <paramref name="sampleRate"/>:
+    /// the smallest integer <c>L</c> with <c>L x sampleRate &gt;= 192 kHz</c>, and at least 1.
+    /// This gives 5x at 44.1 kHz, 4x at 48 kHz, 2x at 96 kHz and 1x at 192 kHz and above.
+    /// </summary>
+    /// <param name="sampleRate">Input sample rate in Hz, between <see cref="LoudnessConstants.MinSampleRate"/> and <see cref="LoudnessConstants.MaxSampleRate"/>.</param>
+    /// <returns>The oversampling factor, from 1 to 24.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="sampleRate"/> is outside the supported range.</exception>
+    public static int GetOversampleFactor(int sampleRate)
+    {
+        LoudnessConstants.EnsureSupportedSampleRate(sampleRate);
+        const int target = LoudnessConstants.TruePeakTargetSampleRate;
+        return Math.Max(1, (target + sampleRate - 1) / sampleRate);
     }
 
     /// <summary>Estimated true-peak level in dBTP.</summary>
@@ -144,17 +192,26 @@ public sealed class TruePeakMeter
     private static double LinearToDb(double v) =>
         v <= 0.0 ? double.NegativeInfinity : DbPerDecadeFactor * Math.Log10(v);
 
-    // Windowed-sinc low-pass split into `OversampleFactor` polyphase branches.
-    private static double[][] BuildPolyphase()
+    // Windowed-sinc low-pass split into `factor` polyphase branches. A factor of 1 is the identity:
+    // the measurement grid is the input grid, so the only tap is the current sample.
+    private static double[][] BuildPolyphase(int factor)
     {
-        int length = OversampleFactor * TapsPerPhase;
+        if (factor == 1)
+        {
+            var identity = new double[TapsPerPhase];
+            identity[0] = UnityGain;
+            return [identity];
+        }
+
+        int length = factor * TapsPerPhase;
         var proto = new double[length];
         double center = (length - 1) / FilterCenterDivisor;
+        double filterCutoffRatio = 1.0 / factor;
         double sum = 0.0;
 
         for (int n = 0; n < length; n++)
         {
-            double x = (n - center) * FilterCutoffRatio;
+            double x = (n - center) * filterCutoffRatio;
             double sinc = x == 0.0 ? UnityGain : Math.Sin(Math.PI * x) / (Math.PI * x);
             // Hann window.
             double w = HannWindowScale - HannWindowScale *
@@ -164,16 +221,16 @@ public sealed class TruePeakMeter
         }
 
         // Normalise so the summed branches have unity DC gain (per branch = 1).
-        double perBranch = sum / OversampleFactor;
+        double perBranch = sum / factor;
         for (int n = 0; n < length; n++)
             proto[n] /= perBranch;
 
-        var phases = new double[OversampleFactor][];
-        for (int p = 0; p < OversampleFactor; p++)
+        var phases = new double[factor][];
+        for (int p = 0; p < factor; p++)
         {
             var branch = new double[TapsPerPhase];
             for (int t = 0; t < TapsPerPhase; t++)
-                branch[t] = proto[p + t * OversampleFactor];
+                branch[t] = proto[p + t * factor];
             phases[p] = branch;
         }
         return phases;

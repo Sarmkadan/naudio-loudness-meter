@@ -150,6 +150,13 @@ namespace NAudio.Loudness
         /// <summary>Default sample rate for <see cref="LoudnessMeterOptions"/>, in Hz.</summary>
         public const int DefaultSampleRate = 48000;
 
+        /// <summary>
+        /// Minimum effective rate of the true-peak measurement grid, in Hz (192 kHz). The true-peak
+        /// oversampling factor is the smallest integer that lifts the input rate to this value.
+        /// BS.1770-4 Annex 2.
+        /// </summary>
+        public const int TruePeakTargetSampleRate = 192000;
+
         // ------------------------------------------------------------------
         // Normalization and true peak
         // ------------------------------------------------------------------
