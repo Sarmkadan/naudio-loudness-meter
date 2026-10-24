@@ -62,22 +62,23 @@ public sealed class TruePeakMeter
     /// Initializes a new instance of the <see cref="TruePeakMeter"/> class for
     /// <see cref="LoudnessConstants.DefaultSampleRate"/> (48 kHz, 4x oversampling).
     /// </summary>
-    /// <param name="channels">Number of channels in the input signal. Must be greater than zero.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="channels"/> is less than or equal to zero.</exception>
+    /// <param name="channels">Number of channels in the input signal, between 1 and <see cref="LoudnessConstants.MaxStreamChannels"/>.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="channels"/> is outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>.</exception>
     public TruePeakMeter(int channels) : this(channels, LoudnessConstants.DefaultSampleRate) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TruePeakMeter"/> class for the given input sample rate.
     /// The oversampling factor is selected by <see cref="GetOversampleFactor"/>.
     /// </summary>
-    /// <param name="channels">Number of channels in the input signal. Must be greater than zero.</param>
+    /// <param name="channels">Number of channels in the input signal, between 1 and <see cref="LoudnessConstants.MaxStreamChannels"/>.</param>
     /// <param name="sampleRate">Input sample rate in Hz, between <see cref="LoudnessConstants.MinSampleRate"/> and <see cref="LoudnessConstants.MaxSampleRate"/>.</param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="channels"/> is less than or equal to zero, or <paramref name="sampleRate"/> is outside the supported range.
+    /// <paramref name="channels"/> is outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>, or <paramref name="sampleRate"/> is outside the supported range.
     /// </exception>
     public TruePeakMeter(int channels, int sampleRate)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(channels);
+        // Checked before any per-channel array is allocated below.
+        LoudnessConstants.EnsureSupportedStreamChannelCount(channels);
         LoudnessConstants.EnsureSupportedSampleRate(sampleRate);
 
         _channels = channels;

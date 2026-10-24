@@ -15,19 +15,15 @@ public static class SampleProviderLoudnessExtensions
     /// <param name="bufferFrames">Buffer size in frames per channel. Must be positive.</param>
     /// <returns>A <see cref="LoudnessAnalysis"/> containing the measured loudness metrics.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="source"/> has an invalid WaveFormat.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="bufferFrames"/> is not positive.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="source"/> has a channel count outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>
+    /// or a sample rate outside <see cref="LoudnessConstants.MinSampleRate"/> to <see cref="LoudnessConstants.MaxSampleRate"/>,
+    /// or <paramref name="bufferFrames"/> is not positive.
+    /// </exception>
     public static LoudnessAnalysis MeasureLoudness(this ISampleProvider source, int bufferFrames = 4096)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (source.WaveFormat.Channels == 0)
-        {
-            throw new ArgumentException("Source provider's WaveFormat must have a valid channel count.", nameof(source));
-        }
-        if (source.WaveFormat.SampleRate <= 0)
-        {
-            throw new ArgumentException("Source provider's WaveFormat must have a valid sample rate.", nameof(source));
-        }
+        EnsureSupportedFormat(source, nameof(source));
         if (bufferFrames <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(bufferFrames), bufferFrames, "Buffer frames must be positive.");
@@ -79,19 +75,16 @@ public static class SampleProviderLoudnessExtensions
     /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
     /// <returns>A normalized <see cref="ISampleProvider"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sourceFactory"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The provided source has a channel count outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>
+    /// or a sample rate outside the supported range.
+    /// </exception>
     public static ISampleProvider NormalizeLoudnessTwoPass(this Func<ISampleProvider> sourceFactory, double targetLufs, double? truePeakCeilingDb = LoudnessConstants.DefaultTruePeakCeilingDbtp, bool validateSource = true)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
 
         var source = sourceFactory();
-        if (source.WaveFormat.Channels == 0)
-        {
-            throw new ArgumentException("Source provider's WaveFormat must have a valid channel count.", nameof(sourceFactory));
-        }
-        if (source.WaveFormat.SampleRate <= 0)
-        {
-            throw new ArgumentException("Source provider's WaveFormat must have a valid sample rate.", nameof(sourceFactory));
-        }
+        EnsureSupportedFormat(source, nameof(sourceFactory));
 
         var analysis = source.MeasureLoudness();
 
@@ -116,17 +109,14 @@ public static class SampleProviderLoudnessExtensions
     /// <param name="truePeakCeilingDb">The optional true-peak ceiling in dBTP.</param>
     /// <returns>A normalized <see cref="ISampleProvider"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="source"/> has a channel count outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>
+    /// or a sample rate outside the supported range.
+    /// </exception>
     public static ISampleProvider NormalizeLoudnessAdaptive(this ISampleProvider source, double targetLufs, double? truePeakCeilingDb = LoudnessConstants.DefaultTruePeakCeilingDbtp)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (source.WaveFormat.Channels == 0)
-        {
-            throw new ArgumentException("Source provider's WaveFormat must have a valid channel count.", nameof(source));
-        }
-        if (source.WaveFormat.SampleRate <= 0)
-        {
-            throw new ArgumentException("Source provider's WaveFormat must have a valid sample rate.", nameof(source));
-        }
+        EnsureSupportedFormat(source, nameof(source));
 
         return new OnePassAdaptiveLoudnessNormalizingSampleProvider(source, targetLufs, truePeakCeilingDb);
     }
@@ -145,5 +135,13 @@ public static class SampleProviderLoudnessExtensions
         double linearGain = Math.Pow(10.0, gainDb / LoudnessConstants.DbPerAmplitudeDecade);
         var volumeProvider = new VolumeSampleProvider(source) { Volume = (float)linearGain };
         return volumeProvider;
+    }
+
+    // The format comes from the provider, which may be untrusted. Its channel count and
+    // sample rate size meters and buffers, so they are bounded before anything is allocated.
+    private static void EnsureSupportedFormat(ISampleProvider source, string paramName)
+    {
+        LoudnessConstants.EnsureSupportedStreamChannelCount(source.WaveFormat.Channels, paramName);
+        LoudnessConstants.EnsureSupportedSampleRate(source.WaveFormat.SampleRate, paramName);
     }
 }

@@ -98,6 +98,13 @@ namespace NAudio.Loudness
         public const int MaxChannels = 5;
 
         /// <summary>
+        /// Maximum channel count accepted by the streaming meters and <see cref="SampleProviderLoudnessExtensions"/>.
+        /// Far above any real layout (7.1.4 has 12 channels), but low enough that per-channel state
+        /// stays bounded when the format comes from an untrusted source.
+        /// </summary>
+        public const int MaxStreamChannels = 32;
+
+        /// <summary>
         /// Weight G for the front channels L, R and C (1.0). BS.1770-4 section 2.2, Table 4.
         /// </summary>
         public const double FrontChannelWeight = 1.0;
@@ -231,6 +238,32 @@ namespace NAudio.Loudness
             {
                 throw new ArgumentOutOfRangeException(paramName, sampleRate,
                     $"Sample rate must be between {MinSampleRate} and {MaxSampleRate} Hz, but was {sampleRate}.");
+            }
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> if <paramref name="channels"/> is between <see cref="MinChannels"/> and
+        /// <see cref="MaxStreamChannels"/> inclusive.
+        /// </summary>
+        /// <param name="channels">The interleaved channel count.</param>
+        public static bool IsSupportedStreamChannelCount(int channels) =>
+            channels >= MinChannels && channels <= MaxStreamChannels;
+
+        /// <summary>
+        /// Throws if <paramref name="channels"/> is outside the range accepted by the streaming meters.
+        /// Call this before sizing any per-channel buffer from a caller-supplied channel count.
+        /// </summary>
+        /// <param name="channels">The interleaved channel count.</param>
+        /// <param name="paramName">The name of the argument, used in the exception.</param>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="channels"/> is outside <see cref="MinChannels"/> to <see cref="MaxStreamChannels"/>.
+        /// </exception>
+        public static void EnsureSupportedStreamChannelCount(int channels, string paramName = "channels")
+        {
+            if (!IsSupportedStreamChannelCount(channels))
+            {
+                throw new ArgumentOutOfRangeException(paramName, channels,
+                    $"Channel count must be between {MinChannels} and {MaxStreamChannels}, but was {channels}.");
             }
         }
     }

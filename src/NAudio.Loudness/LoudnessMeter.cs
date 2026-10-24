@@ -47,17 +47,23 @@ public sealed class LoudnessMeter
     private int _totalBlockCount = 0;
 
     /// <summary>Initializes a loudness meter using the default weights for the channel count.</summary>
-    /// <param name="sampleRate">The sample rate in Hz.</param>
-    /// <param name="channels">The number of interleaved audio channels.</param>
+    /// <param name="sampleRate">The sample rate in Hz, between <see cref="LoudnessConstants.MinSampleRate"/> and <see cref="LoudnessConstants.MaxSampleRate"/>.</param>
+    /// <param name="channels">The number of interleaved audio channels, between 1 and <see cref="LoudnessConstants.MaxStreamChannels"/>.</param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="sampleRate"/> or <paramref name="channels"/> is not positive.
-    /// </exception>
-    /// <exception cref="ArgumentException">
-    /// No default channel weights are available for <paramref name="channels"/>.
+    /// <paramref name="sampleRate"/> is outside the supported range, or <paramref name="channels"/> is outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>.
     /// </exception>
     public LoudnessMeter(int sampleRate, int channels)
-        : this(sampleRate, channels, ChannelWeights.ForChannelCount(channels))
+        : this(sampleRate, channels, DefaultChannelWeights(sampleRate, channels))
     {
+    }
+
+    // Bounds are checked before ChannelWeights allocates one weight per channel, so an
+    // absurd count from an untrusted format fails here instead of exhausting memory.
+    private static double[] DefaultChannelWeights(int sampleRate, int channels)
+    {
+        LoudnessConstants.EnsureSupportedSampleRate(sampleRate);
+        LoudnessConstants.EnsureSupportedStreamChannelCount(channels);
+        return ChannelWeights.ForChannelCount(channels);
     }
 
     /// <summary>Initializes a loudness meter from validated options.</summary>
@@ -89,11 +95,11 @@ public sealed class LoudnessMeter
         Math.Max(1, (int)Math.Round(windowMs / (SubBlockSeconds * 1000.0)));
 
     /// <summary>Initializes a loudness meter using the specified channel weights.</summary>
-    /// <param name="sampleRate">The sample rate in Hz.</param>
-    /// <param name="channels">The number of interleaved audio channels.</param>
+    /// <param name="sampleRate">The sample rate in Hz, between <see cref="LoudnessConstants.MinSampleRate"/> and <see cref="LoudnessConstants.MaxSampleRate"/>.</param>
+    /// <param name="channels">The number of interleaved audio channels, between 1 and <see cref="LoudnessConstants.MaxStreamChannels"/>.</param>
     /// <param name="channelWeights">The loudness weight for each channel.</param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="sampleRate"/> or <paramref name="channels"/> is not positive.
+    /// <paramref name="sampleRate"/> is outside the supported range, or <paramref name="channels"/> is outside 1 to <see cref="LoudnessConstants.MaxStreamChannels"/>.
     /// </exception>
     /// <exception cref="ArgumentNullException"><paramref name="channelWeights"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">
@@ -113,8 +119,8 @@ public sealed class LoudnessMeter
                           int momentaryBlocks, int shortTermBlocks,
                           double absoluteGateLufs, double relativeGateLu)
     {
-        if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
-        if (channels <= 0) throw new ArgumentOutOfRangeException(nameof(channels));
+        LoudnessConstants.EnsureSupportedSampleRate(sampleRate);
+        LoudnessConstants.EnsureSupportedStreamChannelCount(channels);
         ArgumentNullException.ThrowIfNull(channelWeights);
         if (channelWeights.Length != channels)
             throw new ArgumentException("Weight vector length must match channel count.", nameof(channelWeights));
